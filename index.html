@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>H5拍照应用 - 登录</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .app-container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        header h1 {
+            font-size: 36px;
+            font-weight: 700;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        header h1 i {
+            font-size: 40px;
+        }
+        
+        main {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .auth-section {
+            background: white;
+            padding: 50px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 450px;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .auth-section h2 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #34495e;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background-color: #f9f9f9;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #3498db;
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+        
+        .prefix-suggestions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .suggestion-btn {
+            padding: 10px 20px;
+            border: 2px solid #3498db;
+            border-radius: 25px;
+            background-color: white;
+            color: #3498db;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 80px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .suggestion-btn:hover {
+            background-color: #3498db;
+            color: white;
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(52, 152, 219, 0.4);
+        }
+        
+        .suggestion-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(52, 152, 219, 0.3);
+        }
+        
+        #clearInputsBtn:hover {
+            background: linear-gradient(135deg, #c0392b, #a93226);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        #clearInputsBtn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        #loginBtn {
+            width: 100%;
+            margin-top: 20px;
+            padding: 16px;
+            font-size: 18px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        #loginBtn:hover {
+            background: linear-gradient(135deg, #2980b9, #1f618d);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+        }
+        
+        #loginBtn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        #loginBtn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        /* 选项区域样式 */
+        .options-section {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+            width: 100%;
+            margin: 0;
+            margin-top: -30px;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        .options-section h2 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        /* 开始拍照按钮特殊样式 */
+        #startCameraBtn {
+            width: 100%;
+            margin-top: 20px;
+            padding: 14px;
+            font-size: 18px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #27ae60, #229954);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        #startCameraBtn:hover {
+            background: linear-gradient(135deg, #229954, #1e8449);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        /* 选项区域样式 */
+        .options-section {
+            position: relative;
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+            width: 100%;
+            margin: 0;
+            margin-top: -30px;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        /* 退出登录按钮特殊样式 */
+        #logoutBtn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: auto;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+        
+        #logoutBtn:hover {
+            background: linear-gradient(135deg, #c0392b, #a93226);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        /* 预览区域样式 */
+        .preview-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .preview-section h2 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        
+        .current-photo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        #capturedImage {
+            width: 90%;
+            height: 280px;
+            object-fit: contain;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .preview-controls {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-around;
+            gap: 10px;
+            margin-top: 20px;
+            padding: 0 10px;
+            margin-bottom: 20px;
+        }
+        
+        .preview-controls button {
+            width: 120px;
+            height: 80px;
+            padding: 10px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transform: rotate(90deg);
+        }
+        
+        .preview-controls button:hover {
+            background-color: #2980b9;
+            transform: rotate(90deg) translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .preview-controls button:active {
+            transform: rotate(90deg) translateY(0);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .preview-controls button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+            transform: rotate(90deg);
+            box-shadow: none;
+        }
+        
+        /* 照片列表 */
+        .photo-list {
+            margin-top: 30px;
+        }
+        
+        .photo-list h3 {
+            color: #34495e;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        #photoGallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .photo-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .photo-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+        }
+        
+        .photo-item .photo-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 5px;
+            font-size: 12px;
+            text-align: center;
+        }
+        
+        .photo-actions {
+            margin-top: 5px;
+        }
+        
+        .modify-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        
+        .modify-btn:hover {
+            background: #2980b9;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .auth-section {
+                padding: 30px;
+                margin: 0 20px;
+            }
+            
+            header h1 {
+                font-size: 28px;
+            }
+            
+            .auth-section h2 {
+                font-size: 24px;
+            }
+            
+            .form-group input {
+                padding: 12px 15px;
+                font-size: 14px;
+            }
+            
+            #loginBtn {
+                padding: 14px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>
+                <i class="fas fa-camera-retro"></i>
+                拍照软件
+            </h1>
+        </header>
+        
+        <main>
+            <!-- 登录区域 -->
+            <div class="auth-section" style="display: block;">
+                <h2>用户登录</h2>
+                <div class="form-group">
+                    <label for="loginUsername">用户名：</label>
+                    <input type="text" id="loginUsername" placeholder="请输入用户名" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">密码：</label>
+                    <input type="password" id="loginPassword" placeholder="请输入密码" required>
+                </div>
+                <button id="loginBtn">登录</button>
+            </div>
+            
+            <!-- 拍照选项区域 -->
+            <div class="options-section" style="display: none;">
+                <button type="button" id="clearInputsBtn" style="position: absolute; top: 15px; left: 15px; width: auto; padding: 8px 16px; font-size: 12px; font-weight: 600; background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; border: none; border-radius: 6px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10;">
+                    清空
+                </button>
+                <h2 style="text-align: center; margin-bottom: 30px;">拍照选项</h2>
+                <div class="form-group">
+                    <label for="productCode">货号：</label>
+                    <input type="text" id="productCode" placeholder="请输入货号" required>
+                </div>
+                <div class="form-group">
+                    <label for="suffix">后缀：</label>
+                    <input type="text" id="suffix" placeholder="例如：1 或 -1" required>
+                    <div class="prefix-suggestions" style="margin-top: 8px;">
+                        <button type="button" class="suggestion-btn" onclick="document.getElementById('suffix').value = '1'">1</button>
+                        <button type="button" class="suggestion-btn" onclick="document.getElementById('suffix').value = '-1'">-1</button>
+                        <button type="button" class="suggestion-btn" onclick="document.getElementById('suffix').value = '(1)'">(1)</button>
+                    </div>
+                </div>
+                <button id="logoutBtn">退出登录</button>
+                <button id="startCameraBtn">开始拍照</button>
+                <button id="shareBtn" style="width: 100%; margin-top: 10px; padding: 14px; font-size: 18px; font-weight: 600; background: linear-gradient(135deg, #9b59b6, #8e44ad); color: white; border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">加入/创建共享</button>
+                <input type="file" id="systemCameraInput" accept="image/*" capture="camera" style="display: none;" multiple="true">
+            </div>
+            
+            <!-- 共享模态框 -->
+            <div class="modal" id="shareModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; transition: all 0.3s ease;">
+                <div class="modal-content" style="background: white; border-radius: 12px; padding: 25px; max-width: 95%; width: 400px; box-shadow: 0 15px 40px rgba(0,0,0,0.25); transform: translateY(-20px) scale(0.95); transition: all 0.3s ease;">
+                    <div class="modal-header" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #9b59b6; text-align: center;">
+                        <h3 class="modal-title" style="font-size: 20px; font-weight: 700; color: #2c3e50; margin: 0;">共享管理</h3>
+                    </div>
+                    <div class="modal-body" style="margin-bottom: 30px;">
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label for="shareCode" style="display: block; margin-bottom: 8px; font-weight: 600; color: #34495e; font-size: 14px;">共享码：</label>
+                            <input type="text" id="shareCode" placeholder="请输入6位数共享码,留空创建新共享" style="width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label for="shareName" style="display: block; margin-bottom: 8px; font-weight: 600; color: #34495e; font-size: 14px;">共享名称：</label>
+                            <input type="text" id="shareName" placeholder="输入6位数共享名称(创建新共享时必填)" style="width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;">
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 15px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                        <button class="action-btn secondary" onclick="closeModal('shareModal')" style="padding: 10px 20px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 8px; min-width: 100px; justify-content: center; background: #95a5a6; color: white; box-shadow: 0 2px 5px rgba(149, 165, 166, 0.3);">取消</button>
+                        <button class="action-btn primary" onclick="handleShare()" style="padding: 10px 20px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 8px; min-width: 100px; justify-content: center; background: linear-gradient(135deg, #9b59b6, #8e44ad); color: white; box-shadow: 0 2px 5px rgba(155, 89, 182, 0.3);">确定</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 预览区域 -->
+            <div class="preview-section" style="display: none;">
+                <h2>预览</h2>
+                
+                <!-- 当前照片预览 -->
+                <div class="current-photo">
+                    <img id="capturedImage" src="" alt="拍摄的照片">
+                </div>
+                
+                <div class="preview-controls">
+                    <button id="uploadPhoto" disabled>上传</button>
+                    <button id="continueCamera">拍摄</button>
+                    <button id="backToForm">返回</button>
+                </div>
+                
+                <!-- 上传进度条 -->
+                <div id="uploadProgress" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 1000; width: 90%; max-width: 400px;">
+                    <div style="font-size: 18px; margin-bottom: 20px; color: #2c3e50; font-weight: 600; text-align: center;">上传进度</div>
+                    <div style="width: 100%; height: 15px; background-color: #f0f0f0; border-radius: 10px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+                        <div id="uploadProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #3498db, #2980b9); transition: width 0.3s ease; border-radius: 10px;"></div>
+                    </div>
+                    <div id="uploadProgressText" style="font-size: 14px; margin-top: 15px; color: #34495e; font-weight: 500; text-align: center;">0%</div>
+                </div>
+                
+                <!-- 照片列表 -->
+                <div class="photo-list">
+                    <h3>已拍摄照片</h3>
+                    <div id="photoGallery"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        // 全局变量
+        let capturedImage = null;
+        let currentNumber = 1;
+        let productCode = '';
+        let suffix = '';
+        let capturedPhotos = [];
+        let token = null;
+        let username = null;
+        let currentShareCode = null;
+        
+        // 尝试从localStorage获取用户信息
+        try {
+            token = localStorage.getItem('token');
+            username = localStorage.getItem('username');
+        } catch (error) {
+            console.error('localStorage访问被阻止:', error);
+            // 忽略错误，继续使用默认值
+        }
+        
+        // 获取DOM元素
+        const productCodeInput = document.getElementById('productCode');
+        const suffixInput = document.getElementById('suffix');
+        const startCameraBtn = document.getElementById('startCameraBtn');
+        const systemCameraInput = document.getElementById('systemCameraInput');
+        const capturedImageEl = document.getElementById('capturedImage');
+        const uploadPhotoBtn = document.getElementById('uploadPhoto');
+        const continueCameraBtn = document.getElementById('continueCamera');
+        const backToFormBtn = document.getElementById('backToForm');
+        const optionsSection = document.querySelector('.options-section');
+        const previewSection = document.querySelector('.preview-section');
+        const clearInputsBtn = document.getElementById('clearInputsBtn');
+        
+        // 登录相关元素
+        const authSection = document.querySelector('.auth-section');
+        const loginUsername = document.getElementById('loginUsername');
+        const loginPassword = document.getElementById('loginPassword');
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        
+        // 检查登录状态
+        function checkLoginStatus() {
+            if (username) {
+                // 已登录，显示拍照选项
+                authSection.style.display = 'none';
+                optionsSection.style.display = 'block';
+            } else {
+                // 未登录，显示登录界面
+                authSection.style.display = 'block';
+                optionsSection.style.display = 'none';
+                previewSection.style.display = 'none';
+            }
+        }
+        
+        // 初始检查登录状态
+        checkLoginStatus();
+        
+        // 登录按钮点击事件
+        loginBtn.addEventListener('click', () => {
+            const loginUsernameValue = loginUsername.value.trim();
+            const loginPasswordValue = loginPassword.value.trim();
+            
+            if (!loginUsernameValue || !loginPasswordValue) {
+                alert('请输入用户名和密码');
+                return;
+            }
+            
+            fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username: loginUsernameValue, password: loginPasswordValue })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.error || '登录失败');
+                    });
+                }
+                return response.json();
+            })
+            .then(result => {
+                // 存储用户信息
+                try {
+                    localStorage.setItem('username', result.user.username);
+                    localStorage.setItem('role', result.user.role || 'user');
+                } catch (error) {
+                    console.error('localStorage访问被阻止:', error);
+                    // 忽略错误，继续使用内存中的变量
+                }
+                username = result.user.username; // 更新全局变量
+                token = 'logged_in'; // 简单标记登录状态
+                
+                alert('登录成功！');
+                checkLoginStatus();
+            })
+            .catch(error => {
+                console.error('登录失败:', error);
+                console.error('错误堆栈:', error.stack);
+                alert(`登录失败: ${error.message}\n错误详情: ${JSON.stringify(error)}`);
+            });
+        });
+        
+        // 退出登录按钮点击事件
+        logoutBtn.addEventListener('click', () => {
+            // 显示确认提示
+            if (confirm('确定要退出登录吗？')) {
+                try {
+                    localStorage.removeItem('username');
+                    localStorage.removeItem('token');
+                } catch (error) {
+                    console.error('localStorage访问被阻止:', error);
+                    // 忽略错误，继续使用内存中的变量
+                }
+                username = null;
+                token = null;
+                alert('已退出登录');
+                checkLoginStatus();
+            }
+        });
+        
+        // 开始拍照按钮点击事件
+        startCameraBtn.addEventListener('click', () => {
+            // 获取表单值
+            productCode = productCodeInput.value.trim();
+            suffix = suffixInput.value.trim();
+            currentNumber = 1; // 默认起始编号为1
+            
+            // 验证表单
+            if (!productCode) {
+                alert('请输入货号');
+                return;
+            }
+            if (!suffix) {
+                alert('请输入后缀');
+                return;
+            }
+            
+            // 清空输入框
+            productCodeInput.value = '';
+            suffixInput.value = '';
+            
+            // 存储参数到localStorage
+            localStorage.setItem('productCode', productCode);
+            localStorage.setItem('suffix', suffix);
+            localStorage.setItem('currentNumber', currentNumber.toString());
+            
+            // 直接打开相机
+            systemCameraInput.click();
+        });
+        
+        // 系统相机输入变化事件
+        systemCameraInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+                // 遍历所有选择的文件
+                for (let i = 0; i < files.length; i++) {
+                    handleSystemCameraPhoto(files[i]);
+                }
+            }
+        });
+        
+        // 处理系统相机拍摄的照片
+        function handleSystemCameraPhoto(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                capturedImage = e.target.result;
+                capturedImageEl.src = capturedImage;
+                
+                // 生成文件名
+                let filename;
+                
+                // 检查是否是修改模式
+                if (window.currentModifyIndex !== undefined) {
+                    // 修改模式：保持原文件名
+                    filename = capturedPhotos[window.currentModifyIndex].filename;
+                } else {
+                    // 正常模式：生成新文件名
+                    // 检查后缀是否包含括号
+                    if (suffix.includes('(') && suffix.includes(')')) {
+                        // 处理括号后缀，如（1）（2）（3）
+                        const match = suffix.match(/\((\d+)\)/);
+                        if (match) {
+                            // 提取括号内的数字作为起始编号
+                            const baseSuffix = suffix.replace(/\(\d+\)/, '');
+                            filename = `${productCode}${baseSuffix}(${currentNumber}).jpg`;
+                        } else {
+                            // 没有数字的情况
+                            filename = `${productCode}${suffix}(${currentNumber}).jpg`;
+                        }
+                    } else {
+                        // 处理普通后缀，如1 2 3 或 -1 -2 -3
+                        const baseSuffix = suffix.replace(/\d+$/, '');
+                        filename = `${productCode}${baseSuffix}${currentNumber}.jpg`;
+                    }
+                }
+                
+                // 创建照片对象
+                const photo = {
+                    id: Date.now(),
+                    url: capturedImage,
+                    filename: filename,
+                    timestamp: new Date().toLocaleString()
+                };
+                
+                // 检查是否是修改模式
+                if (window.currentModifyIndex !== undefined) {
+                    // 替换指定索引的照片
+                    capturedPhotos[window.currentModifyIndex] = photo;
+                    // 清除修改模式标志
+                    window.currentModifyIndex = undefined;
+                } else {
+                    // 添加到已拍摄照片列表
+                    capturedPhotos.push(photo);
+                    // 递增编号
+                    currentNumber++;
+                    localStorage.setItem('currentNumber', currentNumber.toString());
+                }
+                
+                // 更新照片列表显示
+                updatePhotoGallery();
+                
+                // 显示预览区域
+                optionsSection.style.display = 'none';
+                previewSection.style.display = 'block';
+                uploadPhotoBtn.disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // 更新照片列表
+        function updatePhotoGallery() {
+            const photoGallery = document.getElementById('photoGallery');
+            if (!photoGallery) return;
+            
+            // 清空相册
+            photoGallery.innerHTML = '';
+            
+            // 添加照片到相册
+            capturedPhotos.forEach((photo, index) => {
+                const photoItem = document.createElement('div');
+                photoItem.className = 'photo-item';
+                photoItem.innerHTML = `
+                    <img src="${photo.url}" alt="${photo.filename}">
+                    <div class="photo-info">
+                        ${photo.filename}
+                        <div class="photo-actions">
+                            <button class="modify-btn" onclick="modifyPhoto(${index})">修改</button>
+                        </div>
+                    </div>
+                `;
+                photoGallery.appendChild(photoItem);
+            });
+        }
+        
+        // 修改照片
+        function modifyPhoto(index) {
+            // 显示确认提示
+            if (confirm('确定要重新拍摄这张照片吗？')) {
+                // 重置系统相机输入
+                systemCameraInput.value = '';
+                
+                // 保存当前索引，用于替换照片
+                window.currentModifyIndex = index;
+                
+                // 直接打开相机
+                systemCameraInput.click();
+            }
+        }
+        
+        // 上传照片
+        uploadPhotoBtn.addEventListener('click', async () => {
+            if (capturedPhotos.length === 0) {
+                alert('请先拍摄照片');
+                return;
+            }
+            
+            try {
+                // 显示上传进度条
+                const uploadProgress = document.getElementById('uploadProgress');
+                const uploadProgressBar = document.getElementById('uploadProgressBar');
+                const uploadProgressText = document.getElementById('uploadProgressText');
+                uploadProgress.style.display = 'block';
+                uploadProgressBar.style.width = '0%';
+                uploadProgressText.textContent = '0%';
+                
+                // 禁用上传按钮
+                uploadPhotoBtn.disabled = true;
+                
+                console.log('准备上传的照片:', capturedPhotos);
+                
+                // 批量上传所有照片
+                let successCount = 0;
+                let uploadedFiles = [];
+                let totalUploaded = 0;
+                
+                // 并行上传所有照片
+                const uploadPromises = capturedPhotos.map(async (photo, index) => {
+                    try {
+                        // 创建FormData
+                        const formData = new FormData();
+                        formData.append('productCode', productCode);
+                        formData.append('username', username || 'unknown');
+                        if (currentShareCode) {
+                            formData.append('shareCode', currentShareCode);
+                        }
+                        
+                        // 将base64转换为Blob
+                        function base64ToBlob(base64, mimeType) {
+                            const byteCharacters = atob(base64.split(',')[1]);
+                            const byteNumbers = new Array(byteCharacters.length);
+                            for (let i = 0; i < byteCharacters.length; i++) {
+                                byteNumbers[i] = byteCharacters.charCodeAt(i);
+                            }
+                            const byteArray = new Uint8Array(byteNumbers);
+                            return new Blob([byteArray], { type: mimeType || 'image/jpeg' });
+                        }
+                        const blob = base64ToBlob(photo.url, 'image/jpeg');
+                        formData.append('photo', blob, photo.filename);
+                        
+                        // 发送到后端API
+                        console.log('开始上传照片:', photo.filename);
+                        console.log('上传请求URL:', window.location.origin + '/api/photos');
+                        
+                        try {
+                            // 添加超时设置
+                            const controller = new AbortController();
+                            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时
+
+                            const res = await fetch('/api/photos', {
+                                method: 'POST',
+                                body: formData,
+                                signal: controller.signal
+                            });
+
+                            clearTimeout(timeoutId);
+                            
+                            console.log(`上传响应状态: ${res.status} ${res.statusText}`);
+                            console.log(`上传响应URL: ${res.url}`);
+                            
+                            if (res.ok) {
+                                successCount++;
+                                uploadedFiles.push(photo.filename);
+                                console.log(`成功上传: ${photo.filename}`);
+                            } else {
+                                console.log(`上传失败: ${photo.filename}`);
+                                // 尝试获取错误信息
+                                try {
+                                    const errorData = await res.json();
+                                    console.log(`上传错误信息:`, errorData);
+                                } catch (e) {
+                                    console.log(`无法解析错误信息:`, e);
+                                }
+                            }
+                        } catch (err) {
+                            console.error(`上传 ${photo.filename} 失败:`, err);
+                            console.error(`错误堆栈:`, err.stack);
+                        }
+                    } catch (err) {
+                        console.error(`上传 ${photo.filename} 失败:`, err);
+                    } finally {
+                        // 更新进度
+                        totalUploaded++;
+                        const progress = Math.round((totalUploaded / capturedPhotos.length) * 100);
+                        uploadProgressBar.style.width = `${progress}%`;
+                        uploadProgressText.textContent = `${progress}% (${totalUploaded}/${capturedPhotos.length})`;
+                    }
+                });
+                
+                // 等待所有上传完成
+                await Promise.all(uploadPromises);
+                
+                console.log('批量上传完成:', successCount, '张成功');
+                console.log('上传的文件:', uploadedFiles);
+                
+                // 隐藏上传进度条
+                uploadProgress.style.display = 'none';
+                
+                // 显示上传结果
+                if (successCount === capturedPhotos.length) {
+                    alert(`成功上传 ${successCount} 张照片！\n文件: ${uploadedFiles.join(', ')}`);
+                } else if (successCount > 0) {
+                    alert(`部分上传成功: ${successCount}/${capturedPhotos.length} 张照片\n成功: ${uploadedFiles.join(', ')}`);
+                } else {
+                    alert('上传失败，请重试');
+                }
+                
+                // 重置系统相机输入
+                systemCameraInput.value = '';
+                capturedImage = null;
+                capturedImageEl.src = '';
+                capturedPhotos = [];
+                
+                // 清空照片列表
+                updatePhotoGallery();
+                
+                // 返回输入货号的界面
+                backToForm();
+            } catch (error) {
+                console.error('上传失败:', error);
+                alert('上传失败，请重试');
+                // 隐藏上传进度条
+                document.getElementById('uploadProgress').style.display = 'none';
+            } finally {
+                // 启用上传按钮
+                uploadPhotoBtn.disabled = false;
+            }
+        });
+        
+        // 继续拍照按钮点击事件
+        continueCameraBtn.addEventListener('click', () => {
+            // 重置系统相机输入
+            systemCameraInput.value = '';
+            capturedImage = null;
+            capturedImageEl.src = '';
+            
+            // 直接打开相机
+            systemCameraInput.click();
+        });
+        
+        // 返回表单
+        backToFormBtn.addEventListener('click', () => {
+            // 显示确认提示
+            if (confirm('确定要返回吗？未上传的照片将会丢失。')) {
+                backToForm();
+            }
+        });
+        
+        // 共享按钮点击事件
+        document.getElementById('shareBtn').addEventListener('click', () => {
+            openShareModal();
+        });
+        
+        // 打开共享模态框
+        function openShareModal() {
+            document.getElementById('shareCode').value = '';
+            document.getElementById('shareName').value = '';
+            const shareModal = document.getElementById('shareModal');
+            shareModal.style.opacity = '1';
+            shareModal.style.visibility = 'visible';
+            shareModal.querySelector('.modal-content').style.transform = 'translateY(0) scale(1)';
+        }
+        
+        // 关闭模态框
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.opacity = '0';
+                modal.style.visibility = 'hidden';
+                modal.querySelector('.modal-content').style.transform = 'translateY(-20px) scale(0.95)';
+            }
+        }
+        
+        // 处理共享
+        function handleShare() {
+            const shareCode = document.getElementById('shareCode').value.trim();
+            const shareName = document.getElementById('shareName').value.trim();
+            
+            if (shareCode) {
+                // 验证共享码是否为6位数
+                if (shareCode.length !== 6 || !/^\d+$/.test(shareCode)) {
+                    alert('请输入6位数共享码');
+                    return;
+                }
+                // 加入共享
+                joinShare(shareCode);
+            } else {
+                // 创建新共享
+                if (!shareName) {
+                    alert('请输入共享名称');
+                    return;
+                }
+                // 验证共享名称是否为6位数
+                if (shareName.length !== 6) {
+                    alert('请输入6位数共享名称');
+                    return;
+                }
+                createShare(shareName);
+            }
+        }
+        
+        // 加入共享
+        async function joinShare(code) {
+            try {
+                const response = await fetch('/api/auth/join-share', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, shareCode: code })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || '加入共享失败');
+                }
+                
+                const result = await response.json();
+                currentShareCode = code;
+                alert(`成功加入共享！\n共享名称: ${result.share.name}\n共享码: ${result.share.code}`);
+                closeModal('shareModal');
+            } catch (error) {
+                console.error('加入共享失败:', error);
+                alert(`加入共享失败: ${error.message}`);
+            }
+        }
+        
+        // 创建共享
+        async function createShare(name) {
+            try {
+                const response = await fetch('/api/auth/create-share', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, shareName: name })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || '创建共享失败');
+                }
+                
+                const result = await response.json();
+                currentShareCode = result.share.code;
+                alert(`成功创建共享！\n共享名称: ${result.share.name}\n共享码: ${result.share.code}\n请将此共享码分享给其他用户`);
+                closeModal('shareModal');
+            } catch (error) {
+                console.error('创建共享失败:', error);
+                alert(`创建共享失败: ${error.message}`);
+            }
+        }
+        
+        // 清空按钮点击事件
+        clearInputsBtn.addEventListener('click', () => {
+            // 清空输入框
+            productCodeInput.value = '';
+            suffixInput.value = '';
+            
+            // 重置相关变量
+            productCode = '';
+            suffix = '';
+            
+            // 聚焦到货号输入框
+            productCodeInput.focus();
+        });
+        
+        function backToForm() {
+            // 重置表单
+            systemCameraInput.value = '';
+            capturedImage = null;
+            capturedImageEl.src = '';
+            capturedPhotos = [];
+            
+            // 清空照片列表
+            updatePhotoGallery();
+            
+            // 显示表单区域
+            previewSection.style.display = 'none';
+            optionsSection.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
