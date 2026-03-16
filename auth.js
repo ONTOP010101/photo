@@ -230,7 +230,7 @@ function changePassword(username, currentPassword, newPassword) {
 }
 
 // 创建共享
-function createShare(username, shareName) {
+function createShare(username, shareName, shareCode) {
     const users = readUsers();
     const user = users.find(u => u.username === username);
     
@@ -238,13 +238,13 @@ function createShare(username, shareName) {
         return { success: false, message: '用户不存在' };
     }
     
-    // 生成6位数随机共享码
-    const shareCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // 使用传入的共享码，如果没有传入则生成4位数随机共享码
+    const code = shareCode || Math.floor(1000 + Math.random() * 9000).toString();
     
     const shares = readShares();
     const newShare = {
         id: shares.length > 0 ? Math.max(...shares.map(s => s.id)) + 1 : 1,
-        code: shareCode,
+        code: code,
         name: shareName,
         owner: username,
         members: [username],
@@ -300,6 +300,29 @@ function getShareOwner(shareCode) {
     return share ? share.owner : null;
 }
 
+// 解散共享房间
+function deleteShare(username, shareCode) {
+    const shares = readShares();
+    const shareIndex = shares.findIndex(s => s.code === shareCode);
+    
+    if (shareIndex === -1) {
+        return { success: false, message: '共享房间不存在' };
+    }
+    
+    const share = shares[shareIndex];
+    
+    // 只有创建者可以解散房间
+    if (share.owner !== username) {
+        return { success: false, message: '只有创建者可以解散房间' };
+    }
+    
+    // 从共享列表中移除
+    shares.splice(shareIndex, 1);
+    writeShares(shares);
+    
+    return { success: true, message: '共享房间已解散' };
+}
+
 module.exports = {
     authConfig,
     registerUser,
@@ -313,5 +336,6 @@ module.exports = {
     createShare,
     joinShare,
     getUserShare,
-    getShareOwner
+    getShareOwner,
+    deleteShare
 };

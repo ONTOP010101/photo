@@ -57,15 +57,20 @@ app.post('/api/photos', upload.single('photo'), (req, res) => {
         console.log('请求体:', req.body);
         console.log('用户名:', req.body.username);
         console.log('共享码:', req.body.shareCode);
+        console.log('产品代码:', req.body.productCode);
         
         let username = req.body.username || 'unknown';
+        console.log('最终使用的用户名:', username);
         
-        // 检查是否有共享码，如果有，获取共享所有者
+        // 检查是否有共享码，如果有，保持实际拍摄者的用户名
+        // 这样可以区分不同用户在共享组中拍摄的照片
         if (req.body.shareCode) {
             const owner = authManager.getShareOwner(req.body.shareCode);
             if (owner) {
-                username = owner;
                 console.log('共享所有者:', owner);
+                console.log('实际拍摄者:', username);
+            } else {
+                console.log('共享码无效或不存在:', req.body.shareCode);
             }
         }
         
@@ -74,12 +79,15 @@ app.post('/api/photos', upload.single('photo'), (req, res) => {
             path: `/uploads/${req.file.filename}`,
             timestamp: new Date().toISOString(),
             productCode: req.body.productCode || '未分类',
-            username: username
+            username: username,
+            shareCode: req.body.shareCode || null
         };
         
         console.log('照片对象:', photo);
-
+        console.log('准备添加照片到存储');
+        
         const newPhoto = storageManager.addPhoto(photo);
+        console.log('照片添加成功:', newPhoto);
         res.status(201).json(newPhoto);
     } catch (error) {
         console.error('上传失败:', error);
@@ -98,15 +106,21 @@ app.post('/api/photos/batch', upload.array('photos', 10), (req, res) => {
         console.log('请求体:', req.body);
         console.log('用户名:', req.body.username);
         console.log('共享码:', req.body.shareCode);
+        console.log('产品代码:', req.body.productCode);
+        console.log('上传文件数量:', req.files.length);
         
         let username = req.body.username || 'unknown';
+        console.log('最终使用的用户名:', username);
         
-        // 检查是否有共享码，如果有，获取共享所有者
+        // 检查是否有共享码，如果有，保持实际拍摄者的用户名
+        // 这样可以区分不同用户在共享组中拍摄的照片
         if (req.body.shareCode) {
             const owner = authManager.getShareOwner(req.body.shareCode);
             if (owner) {
-                username = owner;
                 console.log('共享所有者:', owner);
+                console.log('实际拍摄者:', username);
+            } else {
+                console.log('共享码无效或不存在:', req.body.shareCode);
             }
         }
         
@@ -115,12 +129,20 @@ app.post('/api/photos/batch', upload.array('photos', 10), (req, res) => {
             path: `/uploads/${file.filename}`,
             timestamp: new Date().toISOString(),
             productCode: req.body.productCode || '未分类',
-            username: username
+            username: username,
+            shareCode: req.body.shareCode || null
         }));
         
         console.log('批量上传照片对象:', photos);
+        console.log('准备批量添加照片到存储');
 
-        const newPhotos = photos.map(photo => storageManager.addPhoto(photo));
+        const newPhotos = photos.map(photo => {
+            const newPhoto = storageManager.addPhoto(photo);
+            console.log('照片添加成功:', newPhoto);
+            return newPhoto;
+        });
+        
+        console.log('批量上传完成，成功添加', newPhotos.length, '张照片');
         res.status(201).json({ photos: newPhotos, count: newPhotos.length });
     } catch (error) {
         console.error('批量上传失败:', error);
@@ -335,13 +357,13 @@ app.post('/api/auth/change-password', (req, res) => {
 // 创建共享
 app.post('/api/auth/create-share', (req, res) => {
     try {
-        const { username, shareName } = req.body;
+        const { username, shareName, shareCode } = req.body;
         
         if (!username || !shareName) {
             return res.status(400).json({ error: '请提供用户名和共享名称' });
         }
         
-        const result = authManager.createShare(username, shareName);
+        const result = authManager.createShare(username, shareName, shareCode);
         
         if (!result.success) {
             return res.status(400).json({ error: result.message });
@@ -410,6 +432,28 @@ app.get('/api/auth/share-owner/:shareCode', (req, res) => {
     }
 });
 
+// 解散共享房间
+app.delete('/api/auth/delete-share', (req, res) => {
+    try {
+        const { username, shareCode } = req.body;
+        
+        if (!username || !shareCode) {
+            return res.status(400).json({ error: '请提供用户名和共享码' });
+        }
+        
+        const result = authManager.deleteShare(username, shareCode);
+        
+        if (!result.success) {
+            return res.status(400).json({ error: result.message });
+        }
+        
+        res.json({ message: '共享房间已解散' });
+    } catch (error) {
+        console.error('解散共享房间失败:', error);
+        res.status(500).json({ error: '解散共享房间失败' });
+    }
+});
+
 // 健康检查
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
@@ -447,11 +491,13 @@ try {
     });
     
     // 防止服务器在Trae环境中自动退出
-    console.log('服务器已启动，正在运行中...');
-    setInterval(() => {
-        // 每5分钟发送一次心跳，保持服务器运行
-        console.log('服务器心跳正常');
-    }, 300000);
+        console.log('服务器已启动，正在运行中...');
+        // 保持服务器运行的最简单方法是监听一个不会被触发的事件
+        process.stdin.resume();
+        setInterval(() => {
+            // 每1分钟发送一次心跳，保持服务器运行
+            console.log('服务器心跳正常');
+        }, 60000);
 } catch (error) {
     console.error('启动服务器时发生错误:', error);
     console.error('错误堆栈:', error.stack);

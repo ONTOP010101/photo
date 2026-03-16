@@ -4,12 +4,23 @@ let capturedImage = null;
 let currentNumber = 1;
 let productCode = '';
 let suffix = '';
+let username = null;
+let currentShareCode = null;
 
 // 从localStorage加载参数
 function loadParams() {
     productCode = localStorage.getItem('productCode') || '';
     suffix = localStorage.getItem('suffix') || '';
     currentNumber = parseInt(localStorage.getItem('currentNumber')) || 1;
+    
+    // 加载用户名和共享码
+    try {
+        username = localStorage.getItem('username') || 'unknown';
+        currentShareCode = localStorage.getItem('currentShareCode');
+    } catch (error) {
+        console.error('localStorage访问被阻止:', error);
+        username = 'unknown';
+    }
     
     // 验证参数
     if (!productCode || !suffix) {
@@ -115,9 +126,14 @@ async function uploadPhoto() {
         // 创建FormData
         const formData = new FormData();
         formData.append('photo', blob, filename);
+        formData.append('productCode', productCode);
+        formData.append('username', username || 'unknown');
+        if (currentShareCode) {
+            formData.append('shareCode', currentShareCode);
+        }
         
         // 发送到后端API
-        const res = await fetch('/api/photos', {
+        const res = await fetch('http://192.168.40.252:3001/api/photos', {
             method: 'POST',
             body: formData
         });

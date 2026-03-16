@@ -819,6 +819,10 @@
                         <i class="fas fa-image"></i>
                         <span>总图片数: <span id="totalPhotosCount">0</span></span>
                     </div>
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 0 15px; background: #f8f9fa; border-radius: 8px; font-weight: 600; color: #2c3e50;">
+                        <i class="fas fa-users"></i>
+                        <span onclick="switchTab('users')" style="cursor: pointer; color: #3498db; text-decoration: underline;">点击这里可以查看加入用户</span>
+                    </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <select class="filter-select" id="dateFilter">
                             <option value="custom">自定义</option>
@@ -1223,8 +1227,26 @@
         
         // 获取照片数据
         async function loadPhotos() {
-            return new Promise((resolve, reject) => {
+            return new Promise(async (resolve, reject) => {
                 try {
+                    // 获取用户的共享信息
+                    let userShares = [];
+                    if (currentUserRole !== 'admin') {
+                        const username = localStorage.getItem('adminUsername');
+                        if (username) {
+                            try {
+                                const sharesResponse = await fetch(`/api/auth/user-shares/${username}`);
+                                if (sharesResponse.ok) {
+                                    const sharesData = await sharesResponse.json();
+                                    userShares = sharesData.shares || [];
+                                }
+                            } catch (error) {
+                                console.error('获取共享信息失败:', error);
+                            }
+                        }
+                    }
+                    
+                    // 获取所有照片
                     fetch('/api/photos')
                         .then(response => {
                             if (!response.ok) {
@@ -1243,9 +1265,29 @@
                             
                             // 根据用户角色过滤照片
                             if (currentUserRole !== 'admin') {
-                                // 普通用户只能看到自己的照片
+                                // 普通用户只能看到：
+                                // 1. 自己拍摄的非共享照片（非开启共享的情况下）
+                                // 2. 通过自己创建的共享码拍摄的照片（无论谁拍摄）
                                 const username = localStorage.getItem('adminUsername');
-                                photos = photos.filter(photo => photo.username === username);
+                                
+                                // 过滤照片
+                                photos = photos.filter(photo => {
+                                    // 显示通过自己创建的共享码拍摄的照片（共享所有者可以看到所有通过其共享码拍摄的照片）
+                                    if (photo.shareCode) {
+                                        const share = userShares.find(s => s.code === photo.shareCode && s.owner === username);
+                                        if (share) {
+                                            return true;
+                                        }
+                                    }
+                                    
+                                    // 显示自己拍摄的非共享照片（普通用户只能看到自己拍摄的非共享照片）
+                                    if (!photo.shareCode && photo.username === username) {
+                                        return true;
+                                    }
+                                    
+                                    // 共享加入者不能看到通过共享码拍摄的照片
+                                    return false;
+                                });
                             }
                             
                             allPhotos = photos;
@@ -1396,13 +1438,17 @@
                     return extractNumber(a.filename) - extractNumber(b.filename);
                 });
                 
+                // 获取该货号下的唯一用户名
+                const usernames = [...new Set(productPhotos.map(photo => photo.username).filter(Boolean))];
+                const usernameText = usernames.length > 0 ? ` (${usernames.join(', ')})` : '';
+                
                 html += `
                     <div class="product-group">
                         <div class="product-header">
                             <div>
                                 <h3 class="product-title">
                                     <i class="fas fa-box"></i>
-                                    ${productCode}
+                                    ${productCode}${usernameText}
                                     <span class="product-count">${productPhotos.length}</span>
                                 </h3>
                             </div>
@@ -1431,7 +1477,7 @@
                                 <img src="${photo.path}" alt="${photo.filename}">
                                 <div class="photo-overlay">
                                     <div class="overlay-actions">
-                                        <button class="overlay-btn view" onclick="viewPhoto(${photo.id}, '${photo.path}', '${photo.filename}', '${photo.productCode}', '${photo.timestamp}')">
+                                        <button class="overlay-btn view" onclick="viewPhoto(${photo.id}, '${photo.path}', '${photo.filename}', '${photo.productCode}', '${photo.timestamp}', '${photo.username}')">
                                             <i class="fas fa-eye"></i>
                                         </button>
                                         <button class="overlay-btn delete" onclick="confirmDeletePhoto(${photo.id})">
@@ -1514,7 +1560,7 @@
         });
         
         // 查看照片
-        function viewPhoto(id, path, filename, productCode, timestamp) {
+        function viewPhoto(id, path, filename, productCode, timestamp, username) {
             currentPhotoId = id;
             currentPhotoPath = path;
             
@@ -1522,6 +1568,19 @@
             document.getElementById('modalFilename').textContent = filename;
             document.getElementById('modalProductCode').textContent = productCode || '未分类';
             document.getElementById('modalTimestamp').textContent = new Date(timestamp).toLocaleString();
+            
+            // 添加摄影师信息
+            const modalBody = document.querySelector('#viewModal .modal-body');
+            const usernameElement = modalBody.querySelector('#modalUsername');
+            if (!usernameElement) {
+                // 如果不存在，创建新元素
+                const usernamePara = document.createElement('p');
+                usernamePara.innerHTML = `<strong>摄影师:</strong> <span id="modalUsername">${username || '未知'}</span>`;
+                modalBody.appendChild(usernamePara);
+            } else {
+                // 如果存在，更新内容
+                usernameElement.textContent = username || '未知';
+            }
             
             document.getElementById('viewModal').classList.add('active');
         }
@@ -1852,6 +1911,10 @@
                 loadPhotos();
             } else if (tab === 'users') {
                 // 只有管理员才能访问用户管理
+                if (!currentUserRole) {
+                    alert('请先登录');
+                    return;
+                }
                 if (currentUserRole !== 'admin') {
                     alert('权限不足，只有管理员才能访问用户管理');
                     return;
