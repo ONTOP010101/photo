@@ -459,6 +459,29 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 
+// 更新照片导出状态
+app.put('/api/photos/:id/exported', (req, res) => {
+    try {
+        const { id } = req.params;
+        const { exported } = req.body;
+        
+        if (exported === undefined) {
+            return res.status(400).json({ error: '请提供导出状态' });
+        }
+        
+        const success = storageManager.updatePhotoExportStatus(parseInt(id), exported);
+        
+        if (!success) {
+            return res.status(404).json({ error: '照片不存在' });
+        }
+        
+        res.json({ message: '导出状态更新成功' });
+    } catch (error) {
+        console.error('更新导出状态失败:', error);
+        res.status(500).json({ error: '更新导出状态失败' });
+    }
+});
+
 // 静态文件服务
 app.use(express.static('.'));
 app.use('/uploads', express.static(storageManager.storageConfig.uploadDir));

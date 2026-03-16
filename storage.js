@@ -99,11 +99,25 @@ function getPhotoById(id) {
     return photos.find(p => p.id === id);
 }
 
+// 更新照片导出状态
+function updatePhotoExportStatus(id, exported) {
+    const photos = readPhotos();
+    const photoIndex = photos.findIndex(p => p.id === id);
+    
+    if (photoIndex === -1) {
+        return false;
+    }
+    
+    photos[photoIndex].exported = exported;
+    return writePhotos(photos);
+}
+
 module.exports = {
     storageConfig,
     ensureDirectories,
     addPhoto,
     deletePhoto,
     getAllPhotos,
-    getPhotoById
+    getPhotoById,
+    updatePhotoExportStatus
 };

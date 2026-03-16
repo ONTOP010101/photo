@@ -669,6 +669,25 @@
             previewSection = document.querySelector('.preview-section');
             clearInputsBtn = document.getElementById('clearInputsBtn');
             
+            // 从localStorage读取后缀值
+            try {
+                const savedSuffix = localStorage.getItem('suffix');
+                if (savedSuffix) {
+                    suffixInput.value = savedSuffix;
+                }
+            } catch (error) {
+                console.error('localStorage访问被阻止:', error);
+            }
+            
+            // 监听后缀输入变化，保存到localStorage
+            suffixInput.addEventListener('input', function() {
+                try {
+                    localStorage.setItem('suffix', suffixInput.value);
+                } catch (error) {
+                    console.error('localStorage访问被阻止:', error);
+                }
+            });
+            
             // 登录相关元素
             authSection = document.querySelector('.auth-section');
             loginUsername = document.getElementById('loginUsername');
