@@ -798,9 +798,8 @@
                         return;
                     }
                     
-                    // 清空输入框
+                    // 清空输入框（保留后缀）
                     productCodeInput.value = '';
-                    suffixInput.value = '';
                     
                     // 存储参数到localStorage
                     localStorage.setItem('productCode', productCode);
