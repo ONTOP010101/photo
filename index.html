@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>H5拍照应用 - 登录</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>H5拍照应用 - 登录</title>
+        <link rel="icon" href="data:,">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -733,6 +734,10 @@
                         <i class="fas fa-cloud-upload-alt"></i>
                         上传
                     </button>
+                    <button id="cropPhoto" disabled>
+                        <i class="fas fa-crop"></i>
+                        裁剪
+                    </button>
                     <button id="backToForm">
                         <i class="fas fa-arrow-left"></i>
                         返回
@@ -789,6 +794,27 @@
         </div>
     </div>
     
+    <!-- 裁剪照片模态框 -->
+    <div class="modal" id="cropModal">
+        <div class="modal-content" style="max-width: 95vw; width: 95%; max-height: 90vh; overflow: auto;">
+            <div class="modal-header" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #3498db; text-align: center;">
+                <h3 class="modal-title" style="font-size: 20px; font-weight: 700; color: #2c3e50; margin: 0;">裁剪照片</h3>
+            </div>
+            <div class="modal-body" style="margin-bottom: 20px;">
+                <div style="position: relative; width: 100%; max-width: 100%; margin: 0 auto;">
+                    <canvas id="cropCanvas" style="border: 2px dashed #3498db; cursor: crosshair; max-width: 100%; height: auto;"></canvas>
+                </div>
+                <div style="margin-top: 20px; text-align: center;">
+                    <p style="color: #7f8c8d; font-size: 14px;">请拖动选择要裁剪的区域，然后点击"确认裁剪"按钮</p>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: center; gap: 15px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                <button class="action-btn secondary" onclick="closeModal('cropModal')" style="padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 8px; min-width: 100px; justify-content: center; background: #95a5a6; color: white; box-shadow: 0 2px 5px rgba(149, 165, 166, 0.3);">取消</button>
+                <button class="action-btn primary" onclick="confirmCrop()" style="padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 8px; min-width: 120px; justify-content: center; background: linear-gradient(135deg, #3498db, #2980b9); color: white; box-shadow: 0 2px 5px rgba(52, 152, 219, 0.3);">确认裁剪</button>
+            </div>
+        </div>
+    </div>
+    
     <script>
         // 全局变量
         let capturedImage = null;
@@ -802,11 +828,22 @@
         let currentShareInfo = null;
         let currentPhotoPath = null;
         
+        // 裁剪相关变量
+        let cropCanvas = null;
+        let cropCtx = null;
+        let cropImage = null;
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let endX = 0;
+        let endY = 0;
+        let cropSelection = { x: 0, y: 0, width: 0, height: 0 };
+        
         // DOM元素
         let productCodeInput, suffixInput, startCameraBtn, systemCameraInput, capturedImageEl;
         let uploadPhotoBtn, continueCameraBtn, backToFormBtn, optionsSection, previewSection;
         let clearInputsBtn, authSection, loginUsername, loginPassword, loginBtn, logoutBtn;
-        let scanQRCodeBtn, leaveRoomBtn;
+        let scanQRCodeBtn, leaveRoomBtn, cropPhotoBtn;
         
         // 尝试从localStorage获取用户信息
         try {
@@ -831,9 +868,17 @@
             uploadPhotoBtn = document.getElementById('uploadPhoto');
             continueCameraBtn = document.getElementById('continueCamera');
             backToFormBtn = document.getElementById('backToForm');
+            cropPhotoBtn = document.getElementById('cropPhoto');
             optionsSection = document.querySelector('.options-section');
             previewSection = document.querySelector('.preview-section');
             clearInputsBtn = document.getElementById('clearInputsBtn');
+            
+            // 登录相关元素
+            authSection = document.querySelector('.auth-section');
+            loginUsername = document.getElementById('loginUsername');
+            loginPassword = document.getElementById('loginPassword');
+            loginBtn = document.getElementById('loginBtn');
+            logoutBtn = document.getElementById('logoutBtn');
             
             // 从localStorage读取后缀值
             try {
@@ -986,6 +1031,8 @@
                         for (let i = 0; i < files.length; i++) {
                             handleSystemCameraPhoto(files[i]);
                         }
+                        // 重置输入值，防止同一文件被多次处理
+                        systemCameraInput.value = '';
                     }
                 });
             }
@@ -1209,6 +1256,15 @@
                     productCodeInput.focus();
                 });
             }
+            
+            // 裁剪照片按钮点击事件
+            if (cropPhotoBtn) {
+                cropPhotoBtn.addEventListener('click', () => {
+                    if (capturedImage) {
+                        openCropModal();
+                    }
+                });
+            }
         }
         
         // 检查登录状态
@@ -1297,11 +1353,15 @@
                     // 清除修改模式标志
                     window.currentModifyIndex = undefined;
                 } else {
-                    // 添加到已拍摄照片列表
-                    capturedPhotos.push(photo);
-                    // 递增编号
-                    currentNumber++;
-                    localStorage.setItem('currentNumber', currentNumber.toString());
+                    // 检查是否已经存在相同文件名的照片，防止重复
+                    const existingPhoto = capturedPhotos.find(p => p.filename === photo.filename);
+                    if (!existingPhoto) {
+                        // 添加到已拍摄照片列表
+                        capturedPhotos.push(photo);
+                        // 递增编号
+                        currentNumber++;
+                        localStorage.setItem('currentNumber', currentNumber.toString());
+                    }
                 }
                 
                 // 更新照片列表显示
@@ -1311,6 +1371,7 @@
                 optionsSection.style.display = 'none';
                 previewSection.style.display = 'block';
                 uploadPhotoBtn.disabled = false;
+                cropPhotoBtn.disabled = false;
             };
             reader.readAsDataURL(file);
         }
@@ -1333,6 +1394,7 @@
                         ${photo.filename}
                         <div class="photo-actions">
                             <button class="modify-btn" onclick="modifyPhoto(${index})">修改</button>
+                            <button class="modify-btn" onclick="cropPhotoAtIndex(${index})" style="margin-left: 5px; background: #9b59b6;">裁剪</button>
                         </div>
                     </div>
                 `;
@@ -1353,6 +1415,16 @@
                 // 直接打开相机
                 systemCameraInput.click();
             }
+        }
+        
+        // 裁剪指定索引的照片
+        function cropPhotoAtIndex(index) {
+            // 保存当前要裁剪的照片索引
+            window.currentCropIndex = index;
+            // 设置capturedImage为当前照片的URL
+            capturedImage = capturedPhotos[index].url;
+            // 打开裁剪模态框
+            openCropModal();
         }
         
         // 上传照片
@@ -1669,311 +1741,354 @@
                                 });
                         });
                 } else {
-                    // 旧版API
-                    getUserMedia.call(navigator, { video: true },
-                        function(stream) {
-                            // 旧版API使用URL.createObjectURL
-                            video.src = window.URL.createObjectURL(stream);
-                            video.play();
-                            
-                            // 开始扫描
-                            scanQRCode(video);
-                        },
-                        function(error) {
-                            console.error('无法访问摄像头:', error);
-                            alert('无法访问摄像头，请检查权限设置');
-                            closeModal('scanModal');
-                        }
-                    );
+                    console.error('浏览器不支持getUserMedia API');
+                    alert('您的浏览器不支持扫码功能');
+                    closeModal('scanModal');
                 }
-            } else {
-                alert('您的浏览器不支持扫码功能');
-                closeModal('scanModal');
+            }
+            
+            // 扫码处理
+            function scanQRCode(video) {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                function captureFrame() {
+                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        
+                        // 这里可以添加QR码识别逻辑
+                        // 由于没有内置的QR码识别库，这里简化处理
+                        // 实际项目中可以使用jsQR等库
+                    }
+                    requestAnimationFrame(captureFrame);
+                }
+                
+                captureFrame();
+            }
+            
+            // 加入共享
+            function joinShare(shareCode) {
+                currentShareCode = shareCode;
+                try {
+                    localStorage.setItem('currentShareCode', shareCode);
+                } catch (error) {
+                    console.error('localStorage访问被阻止:', error);
+                }
+                updateShareRoomStatus();
+                closeModal('shareModal');
+                alert('成功加入共享房间');
+            }
+            
+            // 创建共享
+            function createShare(shareName, shareCode) {
+                currentShareCode = shareCode;
+                try {
+                    localStorage.setItem('currentShareCode', shareCode);
+                } catch (error) {
+                    console.error('localStorage访问被阻止:', error);
+                }
+                updateShareRoomStatus();
+                alert('成功创建共享房间');
+            }
+            
+            // 退出共享房间
+            function leaveShareRoom() {
+                currentShareCode = null;
+                currentShareInfo = null;
+                try {
+                    localStorage.removeItem('currentShareCode');
+                } catch (error) {
+                    console.error('localStorage访问被阻止:', error);
+                }
+                updateShareRoomStatus();
+                alert('已退出共享房间');
+            }
+            
+            // 更新共享房间状态
+            function updateShareRoomStatus() {
+                const shareRoomStatus = document.getElementById('shareRoomStatus');
+                const roomNameDisplay = document.getElementById('roomNameDisplay');
+                
+                if (currentShareCode) {
+                    shareRoomStatus.style.display = 'flex';
+                    roomNameDisplay.textContent = '共享房间: ' + currentShareCode;
+                } else {
+                    shareRoomStatus.style.display = 'none';
+                }
+            }
+            
+            // 显示二维码
+            function showQRCode(code, name) {
+                const qrcodeContainer = document.getElementById('qrcodeContainer');
+                const qrcode = document.getElementById('qrcode');
+                const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+                
+                // 清空之前的二维码
+                qrcode.innerHTML = '';
+                
+                // 生成新的二维码
+                new QRCode(qrcode, {
+                    text: window.location.origin + '?shareCode=' + code,
+                    width: 150,
+                    height: 150,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+                
+                roomCodeDisplay.textContent = '房间号: ' + code;
+                qrcodeContainer.style.display = 'block';
             }
         }
         
-        // 扫描二维码
-        function scanQRCode(video) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
+        // 打开裁剪模态框
+        function openCropModal() {
+            // 获取裁剪画布和上下文
+            cropCanvas = document.getElementById('cropCanvas');
+            cropCtx = cropCanvas.getContext('2d');
             
-            function captureFrame() {
-                if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    
-                    // 使用jsQR库识别二维码
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height);
-                    
-                    if (code) {
-                        console.log('扫码成功:', code.data);
-                        processQRCode(code.data);
-                        closeModal('scanModal');
+            // 创建图像对象
+            cropImage = new Image();
+            cropImage.onload = function() {
+                // 设置画布大小，根据设备类型调整
+                const isMobile = window.innerWidth < 768;
+                const maxWidth = isMobile ? window.innerWidth * 0.85 : 600;
+                const maxHeight = isMobile ? window.innerHeight * 0.6 : 400;
+                let width = cropImage.width;
+                let height = cropImage.height;
+                
+                // 计算缩放比例
+                const aspectRatio = width / height;
+                
+                // 调整缩放逻辑，确保横向和纵向照片都能正确显示
+                if (aspectRatio > 1) {
+                    // 横向照片
+                    if (width > maxWidth) {
+                        const ratio = maxWidth / width;
+                        width = maxWidth;
+                        height = height * ratio;
+                    }
+                    // 确保高度不超过限制
+                    if (height > maxHeight) {
+                        const ratio = maxHeight / height;
+                        height = maxHeight;
+                        width = width * ratio;
+                    }
+                } else {
+                    // 纵向照片
+                    if (height > maxHeight) {
+                        const ratio = maxHeight / height;
+                        height = maxHeight;
+                        width = width * ratio;
+                    }
+                    // 确保宽度不超过限制
+                    if (width > maxWidth) {
+                        const ratio = maxWidth / width;
+                        width = maxWidth;
+                        height = height * ratio;
                     }
                 }
                 
-                requestAnimationFrame(captureFrame);
-            }
-            
-            captureFrame();
-        }
-        
-        // 处理二维码数据
-        function processQRCode(data) {
-            // 解析二维码数据
-            const params = new URLSearchParams(data);
-            const shareCode = params.get('shareCode');
-            
-            if (shareCode) {
-                document.getElementById('shareCode').value = shareCode;
-                joinShare(shareCode);
-            } else {
-                alert('无效的二维码');
-            }
-        }
-        
-        // 更新共享房间状态
-        function updateShareRoomStatus() {
-            const statusElement = document.getElementById('shareRoomStatus');
-            const roomNameElement = document.getElementById('roomNameDisplay');
-            const leaveRoomBtn = document.getElementById('leaveRoomBtn');
-            
-            if (currentShareCode && currentShareInfo) {
-                statusElement.style.display = 'flex';
-                // 显示房间名称和创建者用户名
-                roomNameElement.textContent = `${currentShareInfo.name} (创建者: ${currentShareInfo.owner || '未知'})`;
+                cropCanvas.width = width;
+                cropCanvas.height = height;
                 
-                // 根据用户是否是创建者显示不同的按钮文本
-                if (currentShareInfo.owner === username) {
-                    leaveRoomBtn.textContent = '解散房间';
-                } else {
-                    leaveRoomBtn.textContent = '退出房间';
-                }
-            } else {
-                statusElement.style.display = 'none';
-            }
+                // 绘制图像到画布
+                cropCtx.drawImage(cropImage, 0, 0, width, height);
+                
+                // 绑定鼠标事件
+                bindCropEvents();
+            };
+            cropImage.src = capturedImage;
+            
+            // 显示裁剪模态框
+            const cropModal = document.getElementById('cropModal');
+            cropModal.classList.add('active');
         }
         
-        // 退出共享房间
-        function leaveShareRoom() {
-            console.log('=== leaveShareRoom 函数开始 ===');
-            console.log('currentShareCode:', currentShareCode);
-            console.log('currentShareInfo:', currentShareInfo);
-            console.log('username:', username);
+        // 绑定裁剪画布事件
+        function bindCropEvents() {
+            if (!cropCanvas) return;
             
-            // 检查是否有共享房间
-            if (!currentShareCode || !currentShareInfo) {
-                console.log('没有共享房间，直接返回');
+            // 获取画布位置和大小
+            function getCanvasPosition(e) {
+                const rect = cropCanvas.getBoundingClientRect();
+                let clientX, clientY;
+                
+                // 处理触摸事件
+                if (e.touches && e.touches.length > 0) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    // 处理鼠标事件
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+                
+                return {
+                    x: clientX - rect.left,
+                    y: clientY - rect.top
+                };
+            }
+            
+            // 开始拖动事件
+            function startDrag(e) {
+                e.preventDefault();
+                isDragging = true;
+                const pos = getCanvasPosition(e);
+                startX = pos.x;
+                startY = pos.y;
+            }
+            
+            // 拖动中事件
+            function drag(e) {
+                e.preventDefault();
+                if (!isDragging) return;
+                const pos = getCanvasPosition(e);
+                endX = pos.x;
+                endY = pos.y;
+                
+                // 重绘画布
+                cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+                cropCtx.drawImage(cropImage, 0, 0, cropCanvas.width, cropCanvas.height);
+                
+                // 绘制选择区域
+                const x = Math.min(startX, endX);
+                const y = Math.min(startY, endY);
+                const width = Math.abs(endX - startX);
+                const height = Math.abs(endY - startY);
+                
+                cropCtx.setLineDash([5, 5]);
+                cropCtx.strokeStyle = '#3498db';
+                cropCtx.lineWidth = 2;
+                cropCtx.strokeRect(x, y, width, height);
+                
+                // 填充半透明区域
+                cropCtx.fillStyle = 'rgba(52, 152, 219, 0.3)';
+                cropCtx.fillRect(x, y, width, height);
+                
+                // 更新选择区域
+                cropSelection = { x, y, width, height };
+            }
+            
+            // 结束拖动事件
+            function endDrag() {
+                isDragging = false;
+            }
+            
+            // 鼠标事件
+            cropCanvas.addEventListener('mousedown', startDrag);
+            cropCanvas.addEventListener('mousemove', drag);
+            cropCanvas.addEventListener('mouseup', endDrag);
+            cropCanvas.addEventListener('mouseleave', endDrag);
+            
+            // 触摸事件
+            cropCanvas.addEventListener('touchstart', startDrag);
+            cropCanvas.addEventListener('touchmove', drag);
+            cropCanvas.addEventListener('touchend', endDrag);
+            cropCanvas.addEventListener('touchcancel', endDrag);
+        }
+        
+        // 确认裁剪
+        function confirmCrop() {
+            if (cropSelection.width === 0 || cropSelection.height === 0) {
+                alert('请选择要裁剪的区域');
                 return;
             }
             
-            // 根据用户是否是创建者显示不同的确认消息
-            let confirmMessage = '确定要退出共享房间吗？';
-            const isOwner = currentShareInfo.owner === username;
-            console.log('isOwner:', isOwner);
+            // 创建裁剪后的画布
+            const croppedCanvas = document.createElement('canvas');
+            const croppedCtx = croppedCanvas.getContext('2d');
             
-            if (isOwner) {
-                confirmMessage = '确定要解散共享房间吗？';
+            // 设置裁剪画布大小
+            croppedCanvas.width = cropSelection.width;
+            croppedCanvas.height = cropSelection.height;
+            
+            // 裁剪图像 - 直接从原始图像裁剪，避免包含选择区域的半透明效果
+            // 计算原始图像的缩放比例
+            const scaleX = cropImage.width / cropCanvas.width;
+            const scaleY = cropImage.height / cropCanvas.height;
+            
+            // 计算原始图像上的裁剪区域
+            const originalX = cropSelection.x * scaleX;
+            const originalY = cropSelection.y * scaleY;
+            const originalWidth = cropSelection.width * scaleX;
+            const originalHeight = cropSelection.height * scaleY;
+            
+            // 从原始图像裁剪
+            croppedCtx.drawImage(
+                cropImage,
+                originalX,
+                originalY,
+                originalWidth,
+                originalHeight,
+                0,
+                0,
+                cropSelection.width,
+                cropSelection.height
+            );
+            
+            // 转换为base64
+            const croppedImage = croppedCanvas.toDataURL('image/jpeg');
+            
+            // 更新全局变量
+            capturedImage = croppedImage;
+            capturedImageEl.src = croppedImage;
+            
+            // 更新照片列表中的指定照片
+            if (window.currentCropIndex !== undefined && window.currentCropIndex >= 0 && window.currentCropIndex < capturedPhotos.length) {
+                // 更新指定索引的照片
+                capturedPhotos[window.currentCropIndex].url = croppedImage;
+                // 清除裁剪索引
+                window.currentCropIndex = undefined;
+            } else if (capturedPhotos.length > 0) {
+                // 默认为最后一张照片
+                const lastPhoto = capturedPhotos[capturedPhotos.length - 1];
+                lastPhoto.url = croppedImage;
             }
             
-            console.log('显示确认对话框:', confirmMessage);
-            const userConfirmed = confirm(confirmMessage);
-            console.log('用户选择:', userConfirmed ? '确认' : '取消');
-            
-            if (userConfirmed) {
-                console.log('用户点击了确认，继续执行');
-                // 如果是创建者，需要调用API解散房间
-                if (isOwner) {
-                    console.log('调用API解散房间');
-                    fetch('/api/auth/delete-share', {
-                        method: 'DELETE',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ username, shareCode: currentShareCode })
-                    })
-                    .then(response => {
-                        console.log('API响应状态:', response.status);
-                        if (!response.ok) {
-                            return response.json().then(errorData => {
-                                throw new Error(errorData.error || '解散房间失败');
-                            });
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('API调用成功:', data);
-                        // 成功处理
-                        console.log('清除共享房间信息');
-                        currentShareCode = null;
-                        currentShareInfo = null;
-                        
-                        try {
-                            localStorage.removeItem('currentShareCode');
-                            console.log('localStorage已更新');
-                        } catch (error) {
-                            console.error('localStorage访问被阻止:', error);
-                        }
-                        
-                        console.log('更新共享房间状态');
-                        updateShareRoomStatus();
-                        
-                        console.log('关闭共享模态框');
-                        closeModal('shareModal');
-                        
-                        console.log('显示成功消息');
-                        alert('已解散共享房间');
-                    })
-                    .catch(error => {
-                        console.error('解散房间失败:', error);
-                        alert(`解散房间失败: ${error.message}`);
-                    });
-                } else {
-                    console.log('非创建者，直接退出');
-                    // 非创建者直接退出
-                    console.log('清除共享房间信息');
-                    currentShareCode = null;
-                    currentShareInfo = null;
-                    
-                    try {
-                        localStorage.removeItem('currentShareCode');
-                        console.log('localStorage已更新');
-                    } catch (error) {
-                        console.error('localStorage访问被阻止:', error);
-                    }
-                    
-                    console.log('更新共享房间状态');
-                    updateShareRoomStatus();
-                    
-                    console.log('关闭共享模态框');
-                    closeModal('shareModal');
-                    
-                    console.log('显示成功消息');
-                    alert('已退出共享房间');
-                }
-            } else {
-                console.log('用户点击了取消，不执行任何操作');
-                console.log('currentShareCode 保持不变:', currentShareCode);
-                console.log('currentShareInfo 保持不变:', currentShareInfo);
-            }
-            console.log('=== leaveShareRoom 函数结束 ===');
-        }
-        
-        // 加入共享
-        async function joinShare(code) {
-            try {
-                const response = await fetch('/api/auth/join-share', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ username, shareCode: code })
-                });
-                
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || '加入共享房间失败');
-                }
-                
-                const result = await response.json();
-                currentShareCode = code;
-                currentShareInfo = result.share;
-                // 存储共享码到localStorage
-                try {
-                    localStorage.setItem('currentShareCode', code);
-                } catch (error) {
-                    console.error('localStorage访问被阻止:', error);
-                }
-                alert(`成功加入共享房间！\n房间名称: ${result.share.name}\n房间码: ${result.share.code}`);
-                updateShareRoomStatus();
-                closeModal('shareModal');
-            } catch (error) {
-                console.error('加入共享房间失败:', error);
-                alert(`加入共享房间失败: ${error.message}`);
-            }
-        }
-        
-        // 创建共享
-        async function createShare(name, code) {
-            try {
-                const response = await fetch('/api/auth/create-share', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ username, shareName: name, shareCode: code })
-                });
-                
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || '创建共享房间失败');
-                }
-                
-                const result = await response.json();
-                currentShareCode = result.share.code;
-                currentShareInfo = result.share;
-                // 存储共享码到localStorage
-                try {
-                    localStorage.setItem('currentShareCode', result.share.code);
-                } catch (error) {
-                    console.error('localStorage访问被阻止:', error);
-                }
-                
-                // 显示二维码
-                showQRCode(result.share.code, result.share.name);
-            } catch (error) {
-                console.error('创建共享房间失败:', error);
-                alert(`创建共享房间失败: ${error.message}`);
-            }
-        }
-        
-        // 显示二维码
-        function showQRCode(code, name) {
-            // 生成二维码数据
-            const qrData = `shareCode=${code}`;
-            
-            // 显示二维码容器
-            const qrcodeContainer = document.getElementById('qrcodeContainer');
-            const qrcodeElement = document.getElementById('qrcode');
-            const roomCodeDisplay = document.getElementById('roomCodeDisplay');
-            
-            qrcodeContainer.style.display = 'block';
-            roomCodeDisplay.textContent = `房间码: ${code}`;
-            
-            // 清空之前的二维码
-            qrcodeElement.innerHTML = '';
-            
-            // 使用qrcode.js生成二维码
-            new QRCode(qrcodeElement, {
-                text: qrData,
-                width: 128,
-                height: 128,
-                colorDark: '#000000',
-                colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.H
-            });
-            
-            // 更新共享房间状态
-            updateShareRoomStatus();
-        }
-        
-
-        
-        function backToForm() {
-            // 重置表单
-            systemCameraInput.value = '';
-            capturedImage = null;
-            capturedImageEl.src = '';
-            capturedPhotos = [];
-            
-            // 清空照片列表
+            // 更新照片列表显示
             updatePhotoGallery();
             
-            // 显示表单区域
-            previewSection.style.display = 'none';
-            optionsSection.style.display = 'block';
+            // 关闭裁剪模态框
+            closeModal('cropModal');
+            
+            alert('裁剪成功！');
+        }
+            
+            // 返回表单
+            function backToForm() {
+                // 重置系统相机输入
+                systemCameraInput.value = '';
+                capturedImage = null;
+                capturedImageEl.src = '';
+                capturedPhotos = [];
+                currentNumber = 1;
+                
+                // 清空照片列表
+                updatePhotoGallery();
+                
+                // 隐藏预览区域，显示选项区域
+                previewSection.style.display = 'none';
+                optionsSection.style.display = 'block';
+                uploadPhotoBtn.disabled = true;
+                cropPhotoBtn.disabled = true;
+            }
+        
+        // 处理扫码结果
+        function processQRCode(data) {
+            // 解析二维码数据
+            if (data.includes('shareCode=')) {
+                const shareCode = data.split('shareCode=')[1];
+                if (shareCode && shareCode.length === 4) {
+                    joinShare(shareCode);
+                } else {
+                    alert('无效的二维码');
+                }
+            } else {
+                alert('无效的二维码');
+            }
         }
     </script>
 </body>
