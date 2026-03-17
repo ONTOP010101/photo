@@ -71,20 +71,12 @@ function deletePhoto(id) {
         return false;
     }
     
-    // 删除文件
-    const photo = photos[photoIndex];
-    const filePath = path.join(storageConfig.uploadDir, photo.filename);
-    if (fs.existsSync(filePath)) {
-        try {
-            fs.unlinkSync(filePath);
-        } catch (error) {
-            console.error('删除文件失败:', error);
-        }
-    }
-    
     // 从数组中删除
     photos.splice(photoIndex, 1);
     writePhotos(photos);
+    
+    // 注意：不再删除文件，因为同一个文件可能被多个用户引用
+    // 这样当一个用户删除照片时，不会影响其他用户的照片
     return true;
 }
 

@@ -60,6 +60,11 @@ function readShares() {
     }
 }
 
+// 获取所有共享房间（包括已解散的）
+function getAllShares() {
+    return readShares();
+}
+
 // 写入共享数据
 function writeShares(shares) {
     ensureDirectories();
@@ -288,14 +293,18 @@ function joinShare(username, shareCode) {
 // 获取用户的共享信息
 function getUserShare(username) {
     const shares = readShares();
-    // 查找用户加入的共享
-    const userShares = shares.filter(share => share.members.includes(username));
+    // 查找用户加入的活跃共享房间（排除已解散的房间）
+    const userShares = shares.filter(share => 
+        share.members.includes(username) && 
+        share.status !== 'dissolved'
+    );
     return userShares;
 }
 
 // 获取共享所有者
 function getShareOwner(shareCode) {
     const shares = readShares();
+    // 查找共享房间，包括已解散的房间
     const share = shares.find(s => s.code === shareCode);
     return share ? share.owner : null;
 }
@@ -316,11 +325,67 @@ function deleteShare(username, shareCode) {
         return { success: false, message: '只有创建者可以解散房间' };
     }
     
-    // 从共享列表中移除
-    shares.splice(shareIndex, 1);
+    // 将共享房间标记为已解散，而不是删除它
+    // 这样创建者仍然能看到通过该共享房间拍摄的照片
+    share.status = 'dissolved';
+    shares[shareIndex] = share;
     writeShares(shares);
     
     return { success: true, message: '共享房间已解散' };
+}
+
+// 为了解决已删除房间的照片可见性问题，添加一个函数来获取用户创建的所有共享码（包括已解散的）
+function getUserCreatedShareCodes(username) {
+    const shares = readShares();
+    // 查找用户创建的所有共享房间（包括已解散的）
+    const userCreatedShares = shares.filter(share => share.owner === username);
+    // 返回这些房间的共享码
+    return userCreatedShares.map(share => share.code);
+}
+
+// 读取照片元数据
+function readPhotos() {
+    const storageConfig = {
+        metadataFile: require('path').join(__dirname, 'data', 'photos.json')
+    };
+    
+    const dataDir = require('path').dirname(storageConfig.metadataFile);
+    if (!require('fs').existsSync(dataDir)) {
+        require('fs').mkdirSync(dataDir, { recursive: true });
+    }
+    
+    if (!require('fs').existsSync(storageConfig.metadataFile)) {
+        require('fs').writeFileSync(storageConfig.metadataFile, JSON.stringify([]));
+        return [];
+    }
+    
+    try {
+        const data = require('fs').readFileSync(storageConfig.metadataFile, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('读取照片元数据失败:', error);
+        return [];
+    }
+}
+
+// 写入照片元数据
+function writePhotos(photos) {
+    const storageConfig = {
+        metadataFile: require('path').join(__dirname, 'data', 'photos.json')
+    };
+    
+    const dataDir = require('path').dirname(storageConfig.metadataFile);
+    if (!require('fs').existsSync(dataDir)) {
+        require('fs').mkdirSync(dataDir, { recursive: true });
+    }
+    
+    try {
+        require('fs').writeFileSync(storageConfig.metadataFile, JSON.stringify(photos, null, 2));
+        return true;
+    } catch (error) {
+        console.error('写入照片元数据失败:', error);
+        return false;
+    }
 }
 
 module.exports = {
@@ -337,5 +402,7 @@ module.exports = {
     joinShare,
     getUserShare,
     getShareOwner,
-    deleteShare
+    deleteShare,
+    getAllShares,
+    getUserCreatedShareCodes
 };

@@ -27,7 +27,9 @@ const storage = multer.diskStorage({
     },
     filename: function (req, file, cb) {
         // 使用前端传递的原始文件名（包含货号）
-        cb(null, file.originalname);
+        // 确保文件名使用UTF-8编码
+        const filename = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        cb(null, filename);
     }
 });
 
@@ -174,9 +176,46 @@ app.delete('/api/photos/:id', (req, res) => {
     console.log('收到删除照片请求，ID:', id);
     console.log('ID类型:', typeof id);
     
+    // 获取用户名（从请求体中获取）
+    const username = req.body.username || req.query.username;
+    console.log('请求删除的用户名:', username);
+    
     const parsedId = parseInt(id);
     console.log('解析后的ID:', parsedId);
     console.log('解析后ID类型:', typeof parsedId);
+    
+    // 获取照片信息
+    const photo = storageManager.getPhotoById(parsedId);
+    if (!photo) {
+        console.log('照片不存在，ID:', parsedId);
+        return res.status(404).json({ error: '照片不存在' });
+    }
+    
+    // 检查权限：
+    // 1. 对于非共享照片，只有拍摄者才能删除
+    // 2. 对于共享照片，只有共享房间的创建者才能删除，拍摄者不能删除
+    console.log('检查权限开始');
+    console.log('照片信息:', photo);
+    console.log('请求删除的用户名:', username);
+    
+    if (!photo.shareCode) {
+        // 非共享照片，只有拍摄者才能删除
+        console.log('非共享照片，检查拍摄者:', photo.username, 'vs', username);
+        if (photo.username !== username) {
+            console.log('权限不足，只能删除自己的非共享照片');
+            return res.status(403).json({ error: '权限不足，只能删除自己的非共享照片' });
+        }
+    } else {
+        // 共享照片，只有共享房间的创建者才能删除
+        const owner = authManager.getShareOwner(photo.shareCode);
+        console.log('共享照片，共享房间所有者:', owner, 'vs', username);
+        if (owner !== username) {
+            console.log('权限不足，只有共享房间的创建者才能删除共享照片');
+            return res.status(403).json({ error: '权限不足，只有共享房间的创建者才能删除共享照片' });
+        }
+    }
+    console.log('权限检查通过');
+    
     
     const success = storageManager.deletePhoto(parsedId);
     console.log('删除操作结果:', success);
@@ -457,6 +496,32 @@ app.delete('/api/auth/delete-share', (req, res) => {
 // 健康检查
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
+});
+
+// 获取所有共享房间（包括已解散的）
+app.get('/api/auth/shares', (req, res) => {
+    try {
+        const shares = authManager.getAllShares();
+        res.json(shares);
+    } catch (error) {
+        console.error('获取共享房间失败:', error);
+        res.status(500).json({ error: '获取共享房间失败' });
+    }
+});
+
+// 获取用户创建的所有共享码（包括已解散的）
+app.get('/api/auth/user-created-shares/:username', (req, res) => {
+    try {
+        const { username } = req.params;
+        if (!username) {
+            return res.status(400).json({ error: '请提供用户名' });
+        }
+        const shareCodes = authManager.getUserCreatedShareCodes(username);
+        res.json({ shareCodes });
+    } catch (error) {
+        console.error('获取用户创建的共享码失败:', error);
+        res.status(500).json({ error: '获取用户创建的共享码失败' });
+    }
 });
 
 // 更新照片导出状态
