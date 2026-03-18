@@ -580,12 +580,31 @@ try {
     
     // 防止服务器在Trae环境中自动退出
         console.log('服务器已启动，正在运行中...');
-        // 保持服务器运行的最简单方法是监听一个不会被触发的事件
+        // 保持服务器运行的多种方法
         process.stdin.resume();
+        
+        // 每30秒发送一次心跳，保持服务器运行
         setInterval(() => {
-            // 每1分钟发送一次心跳，保持服务器运行
-            console.log('服务器心跳正常');
-        }, 60000);
+            console.log('服务器心跳正常，运行中...');
+        }, 30000);
+        
+        // 监听SIGTERM信号
+        process.on('SIGTERM', () => {
+            console.log('收到SIGTERM信号，正在关闭服务器...');
+            server.close(() => {
+                console.log('服务器已关闭');
+                process.exit(0);
+            });
+        });
+        
+        // 监听SIGBREAK信号（Windows特有）
+        process.on('SIGBREAK', () => {
+            console.log('收到SIGBREAK信号，正在关闭服务器...');
+            server.close(() => {
+                console.log('服务器已关闭');
+                process.exit(0);
+            });
+        });
 } catch (error) {
     console.error('启动服务器时发生错误:', error);
     console.error('错误堆栈:', error.stack);

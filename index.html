@@ -17,6 +17,14 @@
         html, body {
             overflow-x: hidden;
             width: 100%;
+            /* 阻止下拉刷新 */
+            overscroll-behavior: none;
+        }
+        
+        /* 确保main元素可以正常滚动 */
+        main {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
         
         /* 模态框 */
@@ -801,12 +809,22 @@
                 <h3 class="modal-title" style="font-size: 20px; font-weight: 700; color: #2c3e50; margin: 0;">裁剪照片</h3>
             </div>
             <div class="modal-body" style="margin-bottom: 20px;">
-                <div style="position: relative; width: 100%; max-width: 100%; margin: 0 auto;">
-                    <canvas id="cropCanvas" style="border: 2px dashed #3498db; cursor: crosshair; max-width: 100%; height: auto;"></canvas>
+                <div style="position: relative; width: 100%; max-width: 100%; margin: 0 auto; overflow: visible; border: 2px dashed #3498db;">
+                    <img id="cropImagePreview" style="max-width: 100%; height: auto; z-index: 10; position: relative;" alt="裁剪预览">
+                    <div id="cropFrame" style="position: absolute; border: 2px solid #3498db; background: rgba(52, 152, 219, 0.2); cursor: default; z-index: 1000;">
+                        <!-- 边角控制点 -->
+                        <div class="resize-handle top-left" style="position: absolute; top: -12px; left: -12px; width: 16px; height: 16px; background: #3498db; border: 2px solid white; border-radius: 50%; cursor: nwse-resize; z-index: 110;"></div>
+                        <div class="resize-handle top-right" style="position: absolute; top: -12px; right: -12px; width: 16px; height: 16px; background: #3498db; border: 2px solid white; border-radius: 50%; cursor: nesw-resize; z-index: 110;"></div>
+                        <div class="resize-handle bottom-left" style="position: absolute; bottom: -12px; left: -12px; width: 16px; height: 16px; background: #3498db; border: 2px solid white; border-radius: 50%; cursor: nesw-resize; z-index: 110;"></div>
+                        <div class="resize-handle bottom-right" style="position: absolute; bottom: -12px; right: -12px; width: 16px; height: 16px; background: #3498db; border: 2px solid white; border-radius: 50%; cursor: nwse-resize; z-index: 110;"></div>
+                        <!-- 上下左右中点控制点 -->
+                        <div class="resize-handle top" style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; background: #3498db; border: 2px solid white; border-radius: 50%; cursor: ns-resize; z-index: 110;"></div>
+                        <div class="resize-handle bottom" style="position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; background: #3498db; border: 2px solid white; border-radius: 50%; cursor: ns-resize; z-index: 110;"></div>
+                        <div class="resize-handle left" style="position: absolute; left: -12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; background: #3498db; border: 2px solid white; border-radius: 50%; cursor: ew-resize; z-index: 110;"></div>
+                        <div class="resize-handle right" style="position: absolute; right: -12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; background: #3498db; border: 2px solid white; border-radius: 50%; cursor: ew-resize; z-index: 110;"></div>
+                    </div>
                 </div>
-                <div style="margin-top: 20px; text-align: center;">
-                    <p style="color: #7f8c8d; font-size: 14px;">请拖动选择要裁剪的区域，然后点击"确认裁剪"按钮</p>
-                </div>
+
             </div>
             <div class="modal-footer" style="display: flex; justify-content: center; gap: 15px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
                 <button class="action-btn secondary" onclick="closeModal('cropModal')" style="padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 8px; min-width: 100px; justify-content: center; background: #95a5a6; color: white; box-shadow: 0 2px 5px rgba(149, 165, 166, 0.3);">取消</button>
@@ -827,17 +845,20 @@
         let currentShareCode = null;
         let currentShareInfo = null;
         let currentPhotoPath = null;
+        let currentSection = 'auth'; // 当前显示的 section: auth, options, preview
         
         // 裁剪相关变量
-        let cropCanvas = null;
-        let cropCtx = null;
         let cropImage = null;
+        let cropImagePreview = null;
+        let cropFrame = null;
         let isDragging = false;
+        let isResizing = false;
         let startX = 0;
         let startY = 0;
-        let endX = 0;
-        let endY = 0;
-        let cropSelection = { x: 0, y: 0, width: 0, height: 0 };
+        let startWidth = 0;
+        let startHeight = 0;
+        let resizeHandle = null;
+        let cropArea = { x: 0, y: 0, width: 0, height: 0 };
         
         // DOM元素
         let productCodeInput, suffixInput, startCameraBtn, systemCameraInput, capturedImageEl;
@@ -845,20 +866,154 @@
         let clearInputsBtn, authSection, loginUsername, loginPassword, loginBtn, logoutBtn;
         let scanQRCodeBtn, leaveRoomBtn, cropPhotoBtn;
         
-        // 尝试从localStorage获取用户信息
+        // 尝试从localStorage获取用户信息和页面状态
         try {
             token = localStorage.getItem('token');
             username = localStorage.getItem('username');
             currentShareCode = localStorage.getItem('currentShareCode');
+            currentSection = localStorage.getItem('currentSection') || 'auth';
+            productCode = localStorage.getItem('productCode') || '';
+            suffix = localStorage.getItem('suffix') || '';
+            currentNumber = parseInt(localStorage.getItem('currentNumber')) || 1;
+            
+            // 尝试读取已拍摄的照片
+            const savedPhotos = localStorage.getItem('capturedPhotos');
+            console.log('从localStorage读取的savedPhotos:', savedPhotos);
+            if (savedPhotos) {
+                try {
+                    capturedPhotos = JSON.parse(savedPhotos);
+                    console.log('从localStorage读取了', capturedPhotos.length, '张照片');
+                    console.log('读取的照片数据:', capturedPhotos);
+                    // 如果有照片，设置capturedImage为最后一张照片的URL
+                    if (capturedPhotos.length > 0) {
+                        capturedImage = capturedPhotos[capturedPhotos.length - 1].url;
+                        console.log('设置capturedImage为最后一张照片的URL');
+                    }
+                } catch (e) {
+                    console.error('解析照片数据失败:', e);
+                    capturedPhotos = [];
+                }
+            } else {
+                console.log('localStorage中没有照片数据');
+                capturedPhotos = [];
+            }
+            
             console.log('从localStorage读取的用户名:', username);
             console.log('从localStorage读取的共享码:', currentShareCode);
+            console.log('从localStorage读取的当前section:', currentSection);
         } catch (error) {
             console.error('localStorage访问被阻止:', error);
             // 忽略错误，继续使用默认值
+            capturedPhotos = [];
+        }
+        
+        // 手动测试localStorage容量
+        try {
+            const testData = 'x'.repeat(1024 * 1024); // 1MB测试数据
+            localStorage.setItem('test', testData);
+            console.log('localStorage容量测试成功，剩余空间充足');
+            localStorage.removeItem('test');
+        } catch (e) {
+            console.error('localStorage容量测试失败:', e);
+        }
+        
+        // 保存页面状态到localStorage
+        function saveState() {
+            try {
+                localStorage.setItem('currentSection', currentSection);
+                localStorage.setItem('productCode', productCode);
+                localStorage.setItem('suffix', suffix);
+                localStorage.setItem('currentNumber', currentNumber.toString());
+                // 保存已拍摄的照片
+                if (capturedPhotos && capturedPhotos.length > 0) {
+                    console.log('准备保存', capturedPhotos.length, '张照片到localStorage');
+                    
+                    // 检查localStorage容量
+                    const testData = JSON.stringify(capturedPhotos);
+                    console.log('照片数据大小:', testData.length, 'bytes');
+                    
+                    // 尝试保存
+                    localStorage.setItem('capturedPhotos', testData);
+                    console.log('保存了', capturedPhotos.length, '张照片到localStorage');
+                    
+                    // 验证保存是否成功
+                    const savedPhotos = localStorage.getItem('capturedPhotos');
+                    if (savedPhotos) {
+                        try {
+                            const parsedPhotos = JSON.parse(savedPhotos);
+                            console.log('验证保存结果:', parsedPhotos.length, '张照片');
+                            // 验证每张照片是否都有完整的数据
+                            parsedPhotos.forEach((photo, index) => {
+                                if (photo.url) {
+                                    console.log('照片', index, '有完整的url数据');
+                                } else {
+                                    console.log('照片', index, '缺少url数据');
+                                }
+                            });
+                        } catch (e) {
+                            console.error('解析保存的照片数据失败:', e);
+                            // 保存失败时不要清空照片列表，保持当前照片
+                        }
+                    } else {
+                        console.error('保存照片数据失败：localStorage返回null');
+                        // 保存失败时不要清空照片列表，保持当前照片
+                    }
+                } else {
+                    localStorage.setItem('capturedPhotos', JSON.stringify([]));
+                    console.log('保存了空照片列表到localStorage');
+                }
+            } catch (error) {
+                console.error('保存状态到localStorage失败:', error);
+                // 保存失败时不要清空照片列表，保持当前照片
+            }
+        }
+        
+        // 阻止下拉刷新和左右滑动的函数
+        function preventPullToRefresh() {
+            let startX, startY;
+            
+            // 监听触摸开始事件
+            document.addEventListener('touchstart', function(e) {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            }, { passive: true });
+            
+            // 监听触摸移动事件
+            document.addEventListener('touchmove', function(e) {
+                const currentX = e.touches[0].clientX;
+                const currentY = e.touches[0].clientY;
+                
+                // 计算移动距离
+                const deltaX = currentX - startX;
+                const deltaY = currentY - startY;
+                const absDeltaX = Math.abs(deltaX);
+                
+                // 阻止左右滑动
+                if (absDeltaX > 10) {
+                    e.preventDefault();
+                }
+                
+                // 阻止下拉刷新
+                if (window.scrollY === 0 && deltaY > 10) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+        }
+        
+        // 防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function() {
+                clearTimeout(timeout);
+                timeout = setTimeout(func, wait);
+            };
         }
         
         // 当DOM加载完成后获取元素
         document.addEventListener('DOMContentLoaded', function() {
+            // 阻止下拉刷新
+            preventPullToRefresh();
+            
             // 获取DOM元素
             productCodeInput = document.getElementById('productCode');
             suffixInput = document.getElementById('suffix');
@@ -880,31 +1035,24 @@
             loginBtn = document.getElementById('loginBtn');
             logoutBtn = document.getElementById('logoutBtn');
             
-            // 从localStorage读取后缀值
-            try {
-                const savedSuffix = localStorage.getItem('suffix');
-                if (savedSuffix) {
-                    suffixInput.value = savedSuffix;
-                }
-            } catch (error) {
-                console.error('localStorage访问被阻止:', error);
-            }
+            // 设置表单值
+            productCodeInput.value = productCode;
+            suffixInput.value = suffix;
             
-            // 监听后缀输入变化，保存到localStorage
+            // 创建防抖版的saveState函数
+            const debouncedSaveState = debounce(saveState, 300);
+            
+            // 监听后缀输入变化，保存到localStorage（防抖处理）
             suffixInput.addEventListener('input', function() {
-                try {
-                    localStorage.setItem('suffix', suffixInput.value);
-                } catch (error) {
-                    console.error('localStorage访问被阻止:', error);
-                }
+                suffix = suffixInput.value;
+                debouncedSaveState();
             });
             
-            // 登录相关元素
-            authSection = document.querySelector('.auth-section');
-            loginUsername = document.getElementById('loginUsername');
-            loginPassword = document.getElementById('loginPassword');
-            loginBtn = document.getElementById('loginBtn');
-            logoutBtn = document.getElementById('logoutBtn');
+            // 监听货号输入变化，保存到localStorage（防抖处理）
+            productCodeInput.addEventListener('input', function() {
+                productCode = productCodeInput.value;
+                debouncedSaveState();
+            });
             
             // 共享相关元素
             scanQRCodeBtn = document.getElementById('scanQRCodeBtn');
@@ -914,6 +1062,20 @@
             bindEventListeners();
             
             // 初始检查登录状态
+            checkLoginStatus();
+        });
+        
+        // 监听页面刷新事件，保存状态
+        window.addEventListener('beforeunload', function(e) {
+            // 保存当前状态
+            saveState();
+            // 不要阻止页面刷新
+            delete e.returnValue;
+        });
+        
+        // 监听页面加载完成事件
+        window.addEventListener('load', function() {
+            // 检查登录状态，确保页面显示正确的内容
             checkLoginStatus();
         });
         
@@ -957,6 +1119,10 @@
                         username = result.user.username; // 更新全局变量
                         token = 'logged_in'; // 简单标记登录状态
                         
+                        // 更新当前section并保存状态
+                        currentSection = 'options';
+                        saveState();
+                        
                         alert('登录成功！');
                         checkLoginStatus();
                     })
@@ -977,6 +1143,11 @@
                             localStorage.removeItem('username');
                             localStorage.removeItem('token');
                             localStorage.removeItem('currentShareCode');
+                            localStorage.removeItem('currentSection');
+                            localStorage.removeItem('productCode');
+                            localStorage.removeItem('suffix');
+                            localStorage.removeItem('currentNumber');
+                            localStorage.removeItem('capturedPhotos');
                         } catch (error) {
                             console.error('localStorage访问被阻止:', error);
                             // 忽略错误，继续使用内存中的变量
@@ -985,6 +1156,11 @@
                         token = null;
                         currentShareCode = null;
                         currentShareInfo = null;
+                        currentSection = 'auth';
+                        productCode = '';
+                        suffix = '';
+                        currentNumber = 1;
+                        capturedPhotos = [];
                         alert('已退出登录');
                         checkLoginStatus();
                     }
@@ -1162,9 +1338,13 @@
                         capturedImage = null;
                         capturedImageEl.src = '';
                         capturedPhotos = [];
+                        currentNumber = 1;
                         
                         // 清空照片列表
                         updatePhotoGallery();
+                        
+                        // 保存状态
+                        saveState();
                         
                         // 返回输入货号的界面
                         backToForm();
@@ -1185,6 +1365,7 @@
                 continueCameraBtn.addEventListener('click', () => {
                     // 重置系统相机输入
                     systemCameraInput.value = '';
+                    // 只清空当前预览图，不清空照片列表
                     capturedImage = null;
                     capturedImageEl.src = '';
                     
@@ -1270,9 +1451,41 @@
         // 检查登录状态
         function checkLoginStatus() {
             if (username) {
-                // 已登录，显示拍照选项
+                // 已登录，根据currentSection显示相应界面
                 authSection.style.display = 'none';
-                optionsSection.style.display = 'block';
+                
+                // 如果有照片，优先显示预览界面
+                if (capturedPhotos.length > 0) {
+                    optionsSection.style.display = 'none';
+                    previewSection.style.display = 'block';
+                    // 更新照片列表
+                    updatePhotoGallery();
+                    // 更新预览图
+                    if (capturedImage) {
+                        capturedImageEl.src = capturedImage;
+                    }
+                    currentSection = 'preview';
+                } else if (currentSection === 'options') {
+                    optionsSection.style.display = 'block';
+                    previewSection.style.display = 'none';
+                } else if (currentSection === 'preview') {
+                    optionsSection.style.display = 'none';
+                    previewSection.style.display = 'block';
+                    // 更新照片列表
+                    updatePhotoGallery();
+                    // 更新预览图
+                    if (capturedImage) {
+                        capturedImageEl.src = capturedImage;
+                    }
+                } else {
+                    // 默认显示选项界面
+                    optionsSection.style.display = 'block';
+                    previewSection.style.display = 'none';
+                    currentSection = 'options';
+                }
+                
+                // 保存状态
+                saveState();
                 
                 // 检查是否有共享房间信息
                 if (currentShareCode) {
@@ -1296,6 +1509,8 @@
                 authSection.style.display = 'block';
                 optionsSection.style.display = 'none';
                 previewSection.style.display = 'none';
+                currentSection = 'auth';
+                saveState();
             }
         }
         
@@ -1352,6 +1567,7 @@
                     capturedPhotos[window.currentModifyIndex] = photo;
                     // 清除修改模式标志
                     window.currentModifyIndex = undefined;
+                    console.log('修改了第', window.currentModifyIndex, '张照片');
                 } else {
                     // 检查是否已经存在相同文件名的照片，防止重复
                     const existingPhoto = capturedPhotos.find(p => p.filename === photo.filename);
@@ -1360,9 +1576,16 @@
                         capturedPhotos.push(photo);
                         // 递增编号
                         currentNumber++;
-                        localStorage.setItem('currentNumber', currentNumber.toString());
+                        console.log('添加了新照片，当前照片数量:', capturedPhotos.length);
+                    } else {
+                        console.log('照片已存在，文件名:', photo.filename);
                     }
                 }
+                
+                console.log('保存前的照片列表:', capturedPhotos);
+                
+                // 立即保存状态
+                saveState();
                 
                 // 更新照片列表显示
                 updatePhotoGallery();
@@ -1372,6 +1595,11 @@
                 previewSection.style.display = 'block';
                 uploadPhotoBtn.disabled = false;
                 cropPhotoBtn.disabled = false;
+                
+                // 更新当前section并保存状态
+                currentSection = 'preview';
+                saveState();
+                console.log('保存后的照片数量:', capturedPhotos.length);
             };
             reader.readAsDataURL(file);
         }
@@ -1635,6 +1863,11 @@
             if (modal) {
                 modal.classList.remove('active');
                 
+                // 如果是裁剪模态框，移除裁剪事件监听器
+                if (modalId === 'cropModal') {
+                    removeCropEvents();
+                }
+                
                 // 如果是扫码模态框，释放摄像头资源
                 if (modalId === 'scanModal') {
                     const video = document.getElementById('scanVideo');
@@ -1845,60 +2078,51 @@
         
         // 打开裁剪模态框
         function openCropModal() {
-            // 获取裁剪画布和上下文
-            cropCanvas = document.getElementById('cropCanvas');
-            cropCtx = cropCanvas.getContext('2d');
+            // 获取裁剪相关元素
+            cropImagePreview = document.getElementById('cropImagePreview');
+            cropFrame = document.getElementById('cropFrame');
             
             // 创建图像对象
             cropImage = new Image();
             cropImage.onload = function() {
-                // 设置画布大小，根据设备类型调整
-                const isMobile = window.innerWidth < 768;
-                const maxWidth = isMobile ? window.innerWidth * 0.85 : 600;
-                const maxHeight = isMobile ? window.innerHeight * 0.6 : 400;
-                let width = cropImage.width;
-                let height = cropImage.height;
+                // 重置变量
+                isDragging = false;
+                isResizing = false;
+                resizeHandle = null;
                 
-                // 计算缩放比例
-                const aspectRatio = width / height;
+                // 设置图像源
+                cropImagePreview.src = capturedImage;
                 
-                // 调整缩放逻辑，确保横向和纵向照片都能正确显示
-                if (aspectRatio > 1) {
-                    // 横向照片
-                    if (width > maxWidth) {
-                        const ratio = maxWidth / width;
-                        width = maxWidth;
-                        height = height * ratio;
-                    }
-                    // 确保高度不超过限制
-                    if (height > maxHeight) {
-                        const ratio = maxHeight / height;
-                        height = maxHeight;
-                        width = width * ratio;
-                    }
-                } else {
-                    // 纵向照片
-                    if (height > maxHeight) {
-                        const ratio = maxHeight / height;
-                        height = maxHeight;
-                        width = width * ratio;
-                    }
-                    // 确保宽度不超过限制
-                    if (width > maxWidth) {
-                        const ratio = maxWidth / width;
-                        width = maxWidth;
-                        height = height * ratio;
-                    }
-                }
-                
-                cropCanvas.width = width;
-                cropCanvas.height = height;
-                
-                // 绘制图像到画布
-                cropCtx.drawImage(cropImage, 0, 0, width, height);
-                
-                // 绑定鼠标事件
-                bindCropEvents();
+                // 等待图像加载完成后设置初始状态
+                setTimeout(() => {
+                    const container = cropImagePreview.parentElement;
+                    const containerRect = container.getBoundingClientRect();
+                    const imageRect = cropImagePreview.getBoundingClientRect();
+                    
+                    // 设置初始裁剪框大小为图片大小加上5px边距，并缩小10%
+                    const margin = 5;
+                    const initialWidth = (imageRect.width + margin * 2) * 0.9;
+                    const initialHeight = (imageRect.height + margin * 2) * 0.9;
+                    const initialLeft = (containerRect.width - initialWidth) / 2;
+                    const initialTop = (containerRect.height - initialHeight) / 2;
+                    
+                    // 设置裁剪框位置和大小
+                    cropFrame.style.width = initialWidth + 'px';
+                    cropFrame.style.height = initialHeight + 'px';
+                    cropFrame.style.left = initialLeft + 'px';
+                    cropFrame.style.top = initialTop + 'px';
+                    
+                    // 初始化裁剪区域
+                    cropArea = {
+                        x: initialLeft,
+                        y: initialTop,
+                        width: initialWidth,
+                        height: initialHeight
+                    };
+                    
+                    // 绑定事件
+                    bindCropEvents();
+                }, 100);
             };
             cropImage.src = capturedImage;
             
@@ -1907,126 +2131,218 @@
             cropModal.classList.add('active');
         }
         
-        // 绑定裁剪画布事件
+        // 绑定裁剪事件
         function bindCropEvents() {
-            if (!cropCanvas) return;
+            if (!cropFrame) return;
             
-            // 获取画布位置和大小
-            function getCanvasPosition(e) {
-                const rect = cropCanvas.getBoundingClientRect();
-                let clientX, clientY;
-                
-                // 处理触摸事件
-                if (e.touches && e.touches.length > 0) {
-                    clientX = e.touches[0].clientX;
-                    clientY = e.touches[0].clientY;
-                } else {
-                    // 处理鼠标事件
-                    clientX = e.clientX;
-                    clientY = e.clientY;
+            // 获取容器和图像
+            const container = cropImagePreview.parentElement;
+            const imageRect = cropImagePreview.getBoundingClientRect();
+            
+            // 调整裁剪框大小
+            function startResize(e, handle) {
+                e.preventDefault();
+                isResizing = true;
+                resizeHandle = handle;
+                // 兼容触摸事件和鼠标事件
+                const clientX = e.clientX || e.pageX || e.touches[0].clientX;
+                const clientY = e.clientY || e.pageY || e.touches[0].clientY;
+                startX = clientX;
+                startY = clientY;
+                startWidth = parseFloat(cropFrame.style.width) || 0;
+                startHeight = parseFloat(cropFrame.style.height) || 0;
+                startLeft = parseFloat(cropFrame.style.left) || 0;
+                startTop = parseFloat(cropFrame.style.top) || 0;
+            }
+            
+            function resize(e) {
+                e.preventDefault();
+                if (isResizing && resizeHandle) {
+                    // 兼容触摸事件和鼠标事件
+                    const clientX = e.clientX || e.pageX || e.touches[0].clientX;
+                    const clientY = e.clientY || e.pageY || e.touches[0].clientY;
+                    
+                    const containerRect = container.getBoundingClientRect();
+                    let newWidth = startWidth;
+                    let newHeight = startHeight;
+                    let newLeft = startLeft;
+                    let newTop = startTop;
+                    
+                    switch (resizeHandle) {
+                        case 'top-left':
+                            newWidth = startWidth - (clientX - startX);
+                            newHeight = startHeight - (clientY - startY);
+                            newLeft = startLeft + (clientX - startX);
+                            newTop = startTop + (clientY - startY);
+                            break;
+                        case 'top-right':
+                            newWidth = startWidth + (clientX - startX);
+                            newHeight = startHeight - (clientY - startY);
+                            newTop = startTop + (clientY - startY);
+                            break;
+                        case 'bottom-left':
+                            newWidth = startWidth - (clientX - startX);
+                            newHeight = startHeight + (clientY - startY);
+                            newLeft = startLeft + (clientX - startX);
+                            break;
+                        case 'bottom-right':
+                            newWidth = startWidth + (clientX - startX);
+                            newHeight = startHeight + (clientY - startY);
+                            break;
+                        case 'top':
+                            newHeight = startHeight - (clientY - startY);
+                            newTop = startTop + (clientY - startY);
+                            break;
+                        case 'bottom':
+                            newHeight = startHeight + (clientY - startY);
+                            break;
+                        case 'left':
+                            newWidth = startWidth - (clientX - startX);
+                            newLeft = startLeft + (clientX - startX);
+                            break;
+                        case 'right':
+                            newWidth = startWidth + (clientX - startX);
+                            break;
+                    }
+                    
+                    // 限制最小尺寸为一个合理的小值
+                    const minSize = 50;
+                    
+                    if (newWidth < minSize) {
+                        newWidth = minSize;
+                        if (resizeHandle === 'top-left' || resizeHandle === 'bottom-left') {
+                            newLeft = startLeft + startWidth - minSize;
+                        }
+                    }
+                    if (newHeight < minSize) {
+                        newHeight = minSize;
+                        if (resizeHandle === 'top-left' || resizeHandle === 'top-right') {
+                            newTop = startTop + startHeight - minSize;
+                        }
+                    }
+                    
+                    // 不限制在容器内，允许拉到外面
+                    // 移除容器边界限制代码
+                    
+                    // 更新裁剪框
+                    cropFrame.style.width = newWidth + 'px';
+                    cropFrame.style.height = newHeight + 'px';
+                    cropFrame.style.left = newLeft + 'px';
+                    cropFrame.style.top = newTop + 'px';
+                    
+                    // 更新裁剪区域
+                    cropArea = {
+                        x: newLeft,
+                        y: newTop,
+                        width: newWidth,
+                        height: newHeight
+                    };
                 }
-                
-                return {
-                    x: clientX - rect.left,
-                    y: clientY - rect.top
-                };
             }
             
-            // 开始拖动事件
-            function startDrag(e) {
-                e.preventDefault();
-                isDragging = true;
-                const pos = getCanvasPosition(e);
-                startX = pos.x;
-                startY = pos.y;
+            function endResize() {
+                isResizing = false;
+                resizeHandle = null;
             }
             
-            // 拖动中事件
-            function drag(e) {
-                e.preventDefault();
-                if (!isDragging) return;
-                const pos = getCanvasPosition(e);
-                endX = pos.x;
-                endY = pos.y;
-                
-                // 重绘画布
-                cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
-                cropCtx.drawImage(cropImage, 0, 0, cropCanvas.width, cropCanvas.height);
-                
-                // 绘制选择区域
-                const x = Math.min(startX, endX);
-                const y = Math.min(startY, endY);
-                const width = Math.abs(endX - startX);
-                const height = Math.abs(endY - startY);
-                
-                cropCtx.setLineDash([5, 5]);
-                cropCtx.strokeStyle = '#3498db';
-                cropCtx.lineWidth = 2;
-                cropCtx.strokeRect(x, y, width, height);
-                
-                // 填充半透明区域
-                cropCtx.fillStyle = 'rgba(52, 152, 219, 0.3)';
-                cropCtx.fillRect(x, y, width, height);
-                
-                // 更新选择区域
-                cropSelection = { x, y, width, height };
+            // 保存事件监听器的引用，以便后续移除
+            window.cropEventListeners = {
+                startResize: startResize,
+                resize: resize,
+                endResize: endResize
+            };
+            
+            // 绑定所有控制点的事件
+            const resizeHandles = cropFrame.querySelectorAll('.resize-handle');
+            resizeHandles.forEach(handle => {
+                const handleType = handle.classList[1];
+                const handleStartResize = (e) => startResize(e, handleType);
+                handle.addEventListener('mousedown', handleStartResize);
+                handle.addEventListener('touchstart', handleStartResize, { passive: false });
+                // 保存handle的事件监听器引用
+                if (!window.resizeHandleListeners) {
+                    window.resizeHandleListeners = [];
+                }
+                window.resizeHandleListeners.push({ handle, listener: handleStartResize });
+            });
+            
+            document.addEventListener('mousemove', resize);
+            document.addEventListener('touchmove', resize, { passive: false });
+            document.addEventListener('mouseup', endResize);
+            document.addEventListener('touchend', endResize);
+            document.addEventListener('touchcancel', endResize);
+        }
+        
+        // 移除裁剪事件监听器
+        function removeCropEvents() {
+            if (!window.cropEventListeners) return;
+            
+            const { resize, endResize } = window.cropEventListeners;
+            
+            // 移除文档事件监听器
+            document.removeEventListener('mousemove', resize);
+            document.removeEventListener('touchmove', resize);
+            document.removeEventListener('mouseup', endResize);
+            document.removeEventListener('touchend', endResize);
+            document.removeEventListener('touchcancel', endResize);
+            
+            // 移除所有控制点的事件监听器
+            if (window.resizeHandleListeners) {
+                window.resizeHandleListeners.forEach(({ handle, listener }) => {
+                    handle.removeEventListener('mousedown', listener);
+                    handle.removeEventListener('touchstart', listener);
+                });
+                window.resizeHandleListeners = null;
             }
             
-            // 结束拖动事件
-            function endDrag() {
-                isDragging = false;
-            }
-            
-            // 鼠标事件
-            cropCanvas.addEventListener('mousedown', startDrag);
-            cropCanvas.addEventListener('mousemove', drag);
-            cropCanvas.addEventListener('mouseup', endDrag);
-            cropCanvas.addEventListener('mouseleave', endDrag);
-            
-            // 触摸事件
-            cropCanvas.addEventListener('touchstart', startDrag);
-            cropCanvas.addEventListener('touchmove', drag);
-            cropCanvas.addEventListener('touchend', endDrag);
-            cropCanvas.addEventListener('touchcancel', endDrag);
+            // 清空事件监听器引用
+            window.cropEventListeners = null;
         }
         
         // 确认裁剪
         function confirmCrop() {
-            if (cropSelection.width === 0 || cropSelection.height === 0) {
-                alert('请选择要裁剪的区域');
-                return;
-            }
+            if (!cropImage || !cropImagePreview) return;
             
             // 创建裁剪后的画布
             const croppedCanvas = document.createElement('canvas');
             const croppedCtx = croppedCanvas.getContext('2d');
             
+            // 获取容器和图像信息
+            const container = cropImagePreview.parentElement;
+            const containerRect = container.getBoundingClientRect();
+            const imageRect = cropImagePreview.getBoundingClientRect();
+            
+            // 计算图像在容器中的缩放比例
+            const scaleX = cropImage.width / imageRect.width;
+            const scaleY = cropImage.height / imageRect.height;
+            
             // 设置裁剪画布大小
-            croppedCanvas.width = cropSelection.width;
-            croppedCanvas.height = cropSelection.height;
+            croppedCanvas.width = cropArea.width;
+            croppedCanvas.height = cropArea.height;
             
-            // 裁剪图像 - 直接从原始图像裁剪，避免包含选择区域的半透明效果
-            // 计算原始图像的缩放比例
-            const scaleX = cropImage.width / cropCanvas.width;
-            const scaleY = cropImage.height / cropCanvas.height;
+            // 计算裁剪区域在原始图像上的坐标
+            const cropX = (cropArea.x / containerRect.width) * imageRect.width * scaleX;
+            const cropY = (cropArea.y / containerRect.height) * imageRect.height * scaleY;
+            const cropWidth = (cropArea.width / containerRect.width) * imageRect.width * scaleX;
+            const cropHeight = (cropArea.height / containerRect.height) * imageRect.height * scaleY;
             
-            // 计算原始图像上的裁剪区域
-            const originalX = cropSelection.x * scaleX;
-            const originalY = cropSelection.y * scaleY;
-            const originalWidth = cropSelection.width * scaleX;
-            const originalHeight = cropSelection.height * scaleY;
+            // 确保裁剪区域在图像范围内
+            const finalCropX = Math.max(0, cropX);
+            const finalCropY = Math.max(0, cropY);
+            const finalCropWidth = Math.min(cropWidth, cropImage.width - finalCropX);
+            const finalCropHeight = Math.min(cropHeight, cropImage.height - finalCropY);
             
             // 从原始图像裁剪
             croppedCtx.drawImage(
                 cropImage,
-                originalX,
-                originalY,
-                originalWidth,
-                originalHeight,
+                finalCropX,
+                finalCropY,
+                finalCropWidth,
+                finalCropHeight,
                 0,
                 0,
-                cropSelection.width,
-                cropSelection.height
+                cropArea.width,
+                cropArea.height
             );
             
             // 转换为base64
@@ -2074,6 +2390,10 @@
                 optionsSection.style.display = 'block';
                 uploadPhotoBtn.disabled = true;
                 cropPhotoBtn.disabled = true;
+                
+                // 更新当前section并保存状态
+                currentSection = 'options';
+                saveState();
             }
         
         // 处理扫码结果
