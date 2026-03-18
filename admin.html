@@ -1116,7 +1116,12 @@
                     <label for="exportName">压缩包名称：</label>
                     <input type="text" id="exportName" placeholder="请输入压缩包名称" required value="照片导出">
                 </div>
-
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="exportExcel" style="width: 18px; height: 18px;">
+                        <span>同时导出 Excel 并插入表格</span>
+                    </label>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="action-btn secondary" onclick="closeModal('exportNameModal')">取消</button>
@@ -1465,10 +1470,12 @@
         // 实时刷新功能
         let realtimeRefreshInterval;
         
-        // 启动实时刷新 - 现在只在需要时手动调用，不再自动刷新
+        // 启动实时刷新
         function startRealtimeRefresh() {
-            // 不再设置自动刷新
-            // 实时刷新将由上传操作触发
+            // 每5秒自动刷新一次
+            realtimeRefreshInterval = setInterval(() => {
+                loadPhotos();
+            }, 5000);
         }
         
         // 停止实时刷新
@@ -1574,7 +1581,13 @@
                             
                             filteredPhotos = [...allPhotos];
                             updateStats();
-                            displayPhotos('all'); // 显示照片
+                            // 保留当前状态，不重置为 'all'
+                            // 重新应用搜索和日期筛选
+                            filterPhotos();
+                            // 根据当前状态重新应用导出状态筛选
+                            if (currentStatus === 'exported' || currentStatus === 'unexported') {
+                                filterPhotosByExportStatus(currentStatus);
+                            }
                             resolve();
                         })
                         .catch(error => {
@@ -1976,10 +1989,23 @@
     async function exportToExcel() {
         // 确定要导出的照片：只导出勾选的照片
         let photosToExport = [];
-        const selectedCheckboxes = document.querySelectorAll('.product-checkbox:checked');
-        const selectedProductCodes = Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
         
-        if (selectedProductCodes.length === 0) {
+        // 获取当前页面的状态
+        const currentView = document.getElementById('currentView').textContent;
+        let status = 'all';
+        if (currentView === '全部照片') {
+            status = 'all';
+        } else if (currentView === '已导出照片') {
+            status = 'exported';
+        } else if (currentView === '未导出照片') {
+            status = 'unexported';
+        }
+        
+        // 从 selectedProductCodes 中获取所有选中的货号
+        const selectedProductCodesSet = selectedProductCodes[status] || new Set();
+        const selectedCodes = Array.from(selectedProductCodesSet);
+        
+        if (selectedCodes.length === 0) {
             alert('请先选择要导出的货号');
             return;
         }
@@ -1988,7 +2014,7 @@
         photosToExport = filteredPhotos.filter(photo => {
             if (!photo) return false;
             // 检查照片的货号是否在选中的分组键中
-            return selectedProductCodes.some(groupKey => {
+            return selectedCodes.some(groupKey => {
                 const groupProductCode = groupKey.split('_')[0];
                 return groupProductCode === photo.productCode;
             });
@@ -2000,7 +2026,12 @@
         }
         
         // 打开进度模态框
-        document.getElementById('exportProgressModal').classList.add('active');
+        const exportProgressModal = document.getElementById('exportProgressModal');
+        const exportModalTitle = exportProgressModal.querySelector('.modal-title');
+        if (exportModalTitle) {
+            exportModalTitle.textContent = '导出 Excel 表格';
+        }
+        exportProgressModal.classList.add('active');
         
         // 初始化导出变量
         let exportCanceled = false;
@@ -2017,18 +2048,20 @@
                 return groups;
             }, {});
             
-            // 按货号组ID正序排序（基于货号的时间戳正序）
-            const productCodes = Object.keys(groupedPhotos).sort((a, b) => {
-                // 获取每个货号分组中最新照片的时间戳
-                function getLatestTimestamp(productCode) {
-                    const photos = groupedPhotos[productCode];
-                    if (photos.length === 0) return 0;
-                    // 找到时间戳最大的照片
-                    return Math.max(...photos.map(photo => new Date(photo.timestamp).getTime()));
+            // 按照用户勾选的货号顺序排序
+            const productCodes = [];
+            selectedCodes.forEach(groupKey => {
+                const productCode = groupKey.split('_')[0];
+                if (!productCodes.includes(productCode)) {
+                    productCodes.push(productCode);
                 }
-                
-                // 按时间戳升序排序，最旧的货号排在前面
-                return getLatestTimestamp(a) - getLatestTimestamp(b);
+            });
+            
+            // 确保所有选中的货号都被包含，即使没有照片
+            productCodes.forEach(productCode => {
+                if (!groupedPhotos[productCode]) {
+                    groupedPhotos[productCode] = [];
+                }
             });
             const totalSteps = productCodes.length;
             let currentStep = 0;
@@ -2039,7 +2072,7 @@
             let processedPhotos = 0;
             
             // 更新进度条
-            updateExportProgress(0, '准备中...');
+            updateExportProgress(0, '正在准备导出表格...');
             
             // 创建新的Excel工作簿
             const workbook = new ExcelJS.Workbook();
@@ -2127,7 +2160,7 @@
                     // 更新进度
                     processedPhotos++;
                     const progress = (processedPhotos / totalPhotos) * 85;
-                    updateExportProgress(progress, `正在处理 ${productCode} - ${photo.filename}...`);
+                    updateExportProgress(progress, `正在导出表格: ${productCode} - ${photo.filename}...`);
                     
                     // 下载图片并嵌入到Excel
                     const promise = fetch(imageUrl, {
@@ -2146,11 +2179,14 @@
                         .then(blob => {
                             return new Promise((resolve, reject) => {
                                 const reader = new FileReader();
-                                reader.onload = () => {
+                                reader.onload = async () => {
                                     try {
+                                        // 压缩图片
+                                        const compressedBase64 = await compressImage(reader.result, 0.7); // 0.7 是压缩质量
+                                        
                                         // 嵌入图片
                                         const imageId = workbook.addImage({
-                                            base64: reader.result.split(',')[1],
+                                            base64: compressedBase64,
                                             extension: 'jpeg',
                                         });
                                         
@@ -2197,13 +2233,13 @@
             // 等待所有图片下载完成
             await Promise.all(imagePromises);
             
-            updateExportProgress(95, '正在准备下载...');
+            updateExportProgress(95, '正在准备下载表格...');
             
             // 导出Excel文件
             const exportName = `照片导出_${new Date().toISOString().slice(0, 10)}.xlsx`;
             const buffer = await workbook.xlsx.writeBuffer();
             
-            updateExportProgress(100, '导出完成！');
+            updateExportProgress(100, '表格导出完成！');
             
             // 创建下载链接
             const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -2287,11 +2323,19 @@
             return;
         }
         
+        // 检查是否需要同时导出 Excel
+        const exportExcel = document.getElementById('exportExcel').checked;
+        
         // 关闭命名模态框
         closeModal('exportNameModal');
         
         // 打开进度模态框
-        document.getElementById('exportProgressModal').classList.add('active');
+        const exportProgressModal = document.getElementById('exportProgressModal');
+        const exportModalTitle = exportProgressModal.querySelector('.modal-title');
+        if (exportModalTitle) {
+            exportModalTitle.textContent = '导出图片';
+        }
+        exportProgressModal.classList.add('active');
         
         // 初始化导出变量
         exportZip = new JSZip();
@@ -2302,10 +2346,22 @@
         
         // 如果没有批量选择的照片，检查是否有勾选的货号
         if (photosToExport.length === 0) {
-            const selectedCheckboxes = document.querySelectorAll('.product-checkbox:checked');
-            const selectedProductCodes = selectedCheckboxes.map(checkbox => checkbox.value);
+            // 获取当前页面的状态
+            const currentView = document.getElementById('currentView').textContent;
+            let status = 'all';
+            if (currentView === '全部照片') {
+                status = 'all';
+            } else if (currentView === '已导出照片') {
+                status = 'exported';
+            } else if (currentView === '未导出照片') {
+                status = 'unexported';
+            }
             
-            if (selectedProductCodes.length === 0) {
+            // 从 selectedProductCodes 中获取所有选中的货号
+            const selectedProductCodesSet = selectedProductCodes[status] || new Set();
+            const selectedCodes = Array.from(selectedProductCodesSet);
+            
+            if (selectedCodes.length === 0) {
                 closeModal('exportProgressModal');
                 alert('请先选择要导出的货号');
                 return;
@@ -2315,7 +2371,7 @@
             photosToExport = filteredPhotos.filter(photo => {
                 if (!photo) return false;
                 // 检查照片的货号是否在选中的分组键中
-                return selectedProductCodes.some(groupKey => {
+                return selectedCodes.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
                     return groupProductCode === photo.productCode;
                 });
@@ -2333,42 +2389,58 @@
         window.selectedBatchPhotos = null;
         
         try {
-            // 更新进度条
-            updateExportProgress(0, '准备中...');
-            
-            // 为每张照片创建下载链接并添加到压缩包
-            for (let i = 0; i < photosToExport.length; i++) {
-                if (exportCanceled) {
-                    throw new Error('导出已取消');
-                }
-                
-                const photo = photosToExport[i];
-                if (!photo || !photo.filename || !photo.path) continue;
-                
-                updateExportProgress((i / photosToExport.length) * 100, `正在处理 ${photo.filename}...`);
-                
-                // 下载照片
-                try {
-                    const encodedPath = encodeURI(photo.path);
-                    const response = await fetch(encodedPath);
-                    const blob = await response.blob();
-                    
-                    // 添加到压缩包
-                    exportZip.file(photo.filename, blob);
-                } catch (error) {
-                    console.error(`处理照片 ${photo.filename} 失败:`, error);
-                }
+            // 如果需要同时导出 Excel
+            if (exportExcel) {
+                // 先导出 Excel
+                await exportToExcel();
             }
             
-            updateExportProgress(90, '正在生成压缩包...');
+            // 更新进度条
+            updateExportProgress(0, '正在准备导出图片...');
+            
+            let successfullyExported = 0;
+            
+            // 为每张照片创建下载链接并添加到压缩包
+            const downloadPromises = [];
+            
+            photosToExport.forEach((photo, i) => {
+                if (!photo || !photo.filename || !photo.path) return;
+                
+                const promise = (async () => {
+                    try {
+                        const encodedPath = encodeURI(photo.path);
+                        const response = await fetch(encodedPath);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        const blob = await response.blob();
+                        
+                        // 添加到压缩包
+                        exportZip.file(photo.filename, blob);
+                        successfullyExported++;
+                        
+                        // 更新进度条
+                        updateExportProgress((i / photosToExport.length) * 100, `正在导出图片: ${photo.filename}...`);
+                    } catch (error) {
+                        console.error(`处理照片 ${photo.filename} 失败:`, error);
+                    }
+                })();
+                
+                downloadPromises.push(promise);
+            });
+            
+            // 并行下载所有照片
+            await Promise.all(downloadPromises);
+            
+            updateExportProgress(90, '正在生成图片压缩包...');
             
             // 生成压缩包
             const zipBlob = await exportZip.generateAsync({ type: 'blob' }, function(metadata) {
                 const progress = 90 + (metadata.percent / 10);
-                updateExportProgress(progress, `正在生成压缩包...`);
+                updateExportProgress(progress, `正在生成图片压缩包...`);
             });
             
-            updateExportProgress(100, '导出完成！');
+            updateExportProgress(100, '图片导出完成！');
             
             // 创建下载链接
             const link = document.createElement('a');
@@ -2416,7 +2488,11 @@
             // 关闭进度模态框
             setTimeout(() => {
                 closeModal('exportProgressModal');
-                alert(`成功导出 ${photosToExport.length} 张照片到 ${exportName}.zip`);
+                if (exportExcel) {
+                    alert(`成功导出 ${successfullyExported} 张照片到 ${exportName}.zip\n同时已导出 Excel 表格`);
+                } else {
+                    alert(`成功导出 ${successfullyExported} 张照片到 ${exportName}.zip`);
+                }
             }, 1000);
         } catch (error) {
             console.error('导出失败:', error);
@@ -2615,21 +2691,32 @@
     
     // 批量下载选中的货号
     function batchDownloadSelected() {
-        const selectedCheckboxes = document.querySelectorAll('.product-checkbox:checked');
-        if (selectedCheckboxes.length === 0) {
+        // 获取当前页面的状态
+        const currentView = document.getElementById('currentView').textContent;
+        let status = 'all';
+        if (currentView === '全部照片') {
+            status = 'all';
+        } else if (currentView === '已导出照片') {
+            status = 'exported';
+        } else if (currentView === '未导出照片') {
+            status = 'unexported';
+        }
+        
+        // 从 selectedProductCodes 中获取所有选中的货号
+        const selectedProductCodesSet = selectedProductCodes[status] || new Set();
+        const selectedCodes = Array.from(selectedProductCodesSet);
+        
+        if (selectedCodes.length === 0) {
             alert('请先选择要下载的货号');
             return;
         }
-        
-        // 收集选中的货号
-        const selectedProductCodes = Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
         
         // 收集所有选中货号的照片
         const selectedPhotos = [];
         filteredPhotos.forEach(photo => {
             if (photo) {
                 // 检查照片的货号是否在选中的分组键中
-                const isSelected = selectedProductCodes.some(groupKey => {
+                const isSelected = selectedCodes.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
                     return groupProductCode === photo.productCode;
                 });
@@ -2645,7 +2732,7 @@
         }
         
         // 显示选中的货号和图片数量
-        alert(`已选择 ${selectedProductCodes.length} 个货号，共 ${selectedPhotos.length} 张图片`);
+        alert(`已选择 ${selectedCodes.length} 个货号，共 ${selectedPhotos.length} 张图片`);
         
         // 弹出命名模态框
         document.getElementById('exportNameModal').classList.add('active');
@@ -3172,6 +3259,37 @@
                 closeModal('cropModal');
             }
         }, 'image/jpeg', 0.9);
+    }
+    
+    // 压缩图片函数
+    function compressImage(base64, quality) {
+        return new Promise((resolve, reject) => {
+            const canvas = document.createElement('canvas');
+            const img = new Image();
+            
+            img.onload = function() {
+                // 设置画布大小
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                // 绘制图片
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                // 压缩图片
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                
+                // 提取base64部分
+                const base64Part = compressedDataUrl.split(',')[1];
+                resolve(base64Part);
+            };
+            
+            img.onerror = function() {
+                reject(new Error('图片加载失败'));
+            };
+            
+            img.src = base64;
+        });
     }
     
     // 全局变量
