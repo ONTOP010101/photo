@@ -1376,6 +1376,9 @@
                 console.error('localStorage访问被阻止:', error);
             }
             
+            // 恢复日期时间值
+            restoreDateValues();
+            
             // 启动实时刷新
             startRealtimeRefresh();
             
@@ -1470,24 +1473,69 @@
         // 实时刷新功能
         let realtimeRefreshInterval;
         
-        // 启动实时刷新
+        // 启动实时刷新（已禁用定时刷新，改为WebSocket事件触发）
         function startRealtimeRefresh() {
-            // 每5秒自动刷新一次
-            realtimeRefreshInterval = setInterval(() => {
-                loadPhotos();
-            }, 5000);
-        }
-        
-        // 停止实时刷新
-        function stopRealtimeRefresh() {
-            if (realtimeRefreshInterval) {
-                clearInterval(realtimeRefreshInterval);
-                realtimeRefreshInterval = null;
+            // 已禁用定时刷新，改为通过WebSocket接收上传消息触发刷新
+            console.log('实时刷新已启用，仅在用户上传时触发');
+            
+            // 尝试建立WebSocket连接
+            try {
+                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+                const socket = new WebSocket(wsUrl);
+                
+                socket.onopen = function() {
+                    console.log('WebSocket连接已建立');
+                };
+                
+                socket.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'photo_uploaded') {
+                            console.log('收到照片上传消息，刷新数据');
+                            loadPhotos();
+                        }
+                    } catch (error) {
+                        console.error('解析WebSocket消息失败:', error);
+                    }
+                };
+                
+                socket.onclose = function() {
+                    console.log('WebSocket连接已关闭');
+                    // 尝试重连
+                    setTimeout(() => {
+                        startRealtimeRefresh();
+                    }, 5000);
+                };
+                
+                socket.onerror = function(error) {
+                    console.error('WebSocket错误:', error);
+                };
+                
+                // 存储WebSocket连接
+                window.photoSocket = socket;
+            } catch (error) {
+                console.error('建立WebSocket连接失败:', error);
             }
         }
         
-        // 初始检查登录状态
-        checkLoginStatus();
+        // 停止实时刷新（已禁用定时刷新）
+        function stopRealtimeRefresh() {
+            // 关闭WebSocket连接
+            if (window.photoSocket) {
+                window.photoSocket.close();
+                window.photoSocket = null;
+                console.log('WebSocket连接已关闭');
+            }
+            console.log('实时刷新已停止');
+        }
+        
+        // 初始检查登录状态 - 确保在DOM完全加载后执行
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', checkLoginStatus);
+        } else {
+            checkLoginStatus();
+        }
         
         // 获取照片数据
         async function loadPhotos() {
@@ -1954,13 +2002,45 @@
         
 
         
+        // 保存日期时间值到localStorage
+        function saveDateValues() {
+            const startDate = document.getElementById('customDateStart').value;
+            const endDate = document.getElementById('customDateEnd').value;
+            
+            try {
+                localStorage.setItem('customDateStart', startDate);
+                localStorage.setItem('customDateEnd', endDate);
+            } catch (error) {
+                console.error('localStorage访问被阻止:', error);
+            }
+        }
+        
+        // 从localStorage恢复日期时间值
+        function restoreDateValues() {
+            try {
+                const startDate = localStorage.getItem('customDateStart');
+                const endDate = localStorage.getItem('customDateEnd');
+                
+                if (startDate) {
+                    document.getElementById('customDateStart').value = startDate;
+                }
+                if (endDate) {
+                    document.getElementById('customDateEnd').value = endDate;
+                }
+            } catch (error) {
+                console.error('localStorage访问被阻止:', error);
+            }
+        }
+        
         // 自定义日期变化事件
         document.getElementById('customDateStart').addEventListener('change', function() {
+            saveDateValues();
             filterPhotos();
             // 失去焦点以关闭日期选择器
             this.blur();
         });
         document.getElementById('customDateEnd').addEventListener('change', function() {
+            saveDateValues();
             filterPhotos();
             // 失去焦点以关闭日期选择器
             this.blur();
@@ -2686,6 +2766,15 @@
     function clearDateFilter() {
         document.getElementById('customDateStart').value = '';
         document.getElementById('customDateEnd').value = '';
+        
+        // 同时清除localStorage中的日期值
+        try {
+            localStorage.removeItem('customDateStart');
+            localStorage.removeItem('customDateEnd');
+        } catch (error) {
+            console.error('localStorage访问被阻止:', error);
+        }
+        
         filterPhotos();
     }
     
@@ -3722,8 +3811,14 @@
         });
     });
     
-    // 页面加载时获取照片
-    window.onload = loadPhotos;
+    // 页面加载时恢复日期值 - 确保在DOM完全加载后执行
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            restoreDateValues();
+        });
+    } else {
+        restoreDateValues();
+    }
     </script>
 </body>
 </html>
