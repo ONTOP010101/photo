@@ -1114,6 +1114,9 @@
                 // 初始检查登录状态
                 checkLoginStatus();
                 
+                // 获取后台未导出数量
+                getUnexportedCount();
+                
                 console.log('DOM初始化完成');
             } catch (error) {
                 console.error('DOM初始化错误:', error);
@@ -1147,6 +1150,9 @@
         window.addEventListener('load', function() {
             // 检查登录状态，确保页面显示正确的内容
             checkLoginStatus();
+            
+            // 获取后台未导出数量
+            getUnexportedCount();
         });
         
         // 绑定事件监听器
@@ -1581,6 +1587,9 @@
                 if (username) {
                     // 已登录，根据currentSection显示相应界面
                     if (authSection) authSection.style.display = 'none';
+                    
+                    // 获取后台未导出数量
+                    getUnexportedCount();
                     
                     // 验证 currentSection 值
                     if (!['options', 'preview'].includes(currentSection)) {
