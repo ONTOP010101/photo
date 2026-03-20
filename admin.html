@@ -1841,34 +1841,24 @@
                 const groupId = `product-group-${(sortedProductCodes.length - startIndex - index)}`;
                 let productPhotos = groupedPhotos[groupKey];
                 
-                // 从分组键中提取货号和后缀，去除批次ID
+                // 从分组键中提取原始货号，去除所有批次ID和时间戳
                 let productCode = groupKey;
-                // 找到最后两个连字符的位置，去除时间戳和随机数
-                const hyphens = productCode.match(/-/g);
-                if (hyphens && hyphens.length >= 2) {
-                    // 找到倒数第二个连字符的位置
-                    let lastHyphenIndex = productCode.lastIndexOf('-');
-                    let secondLastHyphenIndex = productCode.lastIndexOf('-', lastHyphenIndex - 1);
-                    if (secondLastHyphenIndex > 0) {
-                        // 提取货号和后缀部分
-                        productCode = productCode.substring(0, secondLastHyphenIndex);
-                    }
-                }
-                // 清理货号，确保只显示货号部分
-                // 处理带括号的后缀，如 19(1)
-                const bracketMatch = productCode.match(/^(.*?)\(\d+\)$/);
-                if (bracketMatch) {
-                    productCode = bracketMatch[1];
-                }
-                // 处理带连字符的后缀，如 19-1
-                if (productCode.includes('-') && productCode.split('-').length === 2) {
-                    const parts = productCode.split('-');
-                    if (/^\d+$/.test(parts[1])) {
+                
+                // 1. 先处理下划线分隔的情况（如 123-1_1774004192518）
+                if (productCode.includes('_')) {
+                    const parts = productCode.split('_');
+                    if (parts.length > 1) {
                         productCode = parts[0];
                     }
                 }
-                // 清理货号，确保只包含字母和数字
-                productCode = productCode.replace(/[^a-zA-Z0-9]/g, '').trim();
+                
+                // 2. 处理连字符分隔的情况，去除批次ID和时间戳
+                // 找到第一个连字符后包含时间戳的部分并去除
+                // 时间戳通常是13位数字，如1774013466067
+                productCode = productCode.replace(/-(\d{10,15})[-\w]*$/, '');
+                
+                // 3. 清理货号，确保只包含字母、数字和连字符
+                productCode = productCode.replace(/[^a-zA-Z0-9-]/g, '').trim();
                 
                 // 对照片进行排序，确保按照文件名的正确顺序排列
                 productPhotos.sort((a, b) => {
@@ -2320,46 +2310,24 @@
                     return extractNumber(a.filename) - extractNumber(b.filename);
                 });
                 
-                // 设置货号，确保去除所有时间戳和随机码
+                // 设置货号，确保去除所有时间戳和随机码，与h3标签显示一致
                 let displayProductCode = productCode;
                 
-                // 1. 先处理下划线分隔的情况（如 123-1_736710）
+                // 1. 先处理下划线分隔的情况（如 123-1_1774004192518）
                 if (displayProductCode.includes('_')) {
                     const parts = displayProductCode.split('_');
                     if (parts.length > 1) {
-                        // 只保留下划线前的部分
                         displayProductCode = parts[0];
                     }
                 }
                 
-                // 2. 处理连字符分隔的情况，去除时间戳和随机码（如 Ac-1774005868573, BC-146309, Ac-1774006823873-202400-ha916j1ls）
-                if (displayProductCode.includes('-')) {
-                    // 分割货号
-                    const parts = displayProductCode.split('-');
-                    // 找到第一个非数字部分作为原始货号
-                    let originalProductCode = '';
-                    for (const part of parts) {
-                        if (!/^[0-9]+$/.test(part) && part.length < 5) {
-                            originalProductCode = part;
-                            break;
-                        }
-                    }
-                    // 如果找到了原始货号，使用它
-                    if (originalProductCode) {
-                        displayProductCode = originalProductCode;
-                    }
-                }
+                // 2. 处理连字符分隔的情况，去除批次ID和时间戳
+                // 找到第一个连字符后包含时间戳的部分并去除
+                // 时间戳通常是13位数字，如1774013466067
+                displayProductCode = displayProductCode.replace(/-(\d{10,15})[-\w]*$/, '');
                 
-                // 3. 提取原始货号，去除批次ID和后缀
-                if (displayProductCode.includes('-') && displayProductCode.split('-').length > 2) {
-                    // 保留前两部分（货号+后缀），去除批次ID
-                    displayProductCode = displayProductCode.split('-').slice(0, 2).join('-');
-                }
-                // 4. 如果货号只有数字和连字符，且只有一个连字符，可能是货号+后缀
-                // 例如：111-1，只保留货号部分
-                if (displayProductCode.match(/^\d+-\d+$/)) {
-                    displayProductCode = displayProductCode.split('-')[0];
-                }
+                // 3. 清理货号，确保只包含字母、数字和连字符
+                displayProductCode = displayProductCode.replace(/[^a-zA-Z0-9-]/g, '').trim();
                 worksheet.getCell(`A${rowIndex}`).value = displayProductCode;
                 
                 // 设置行高

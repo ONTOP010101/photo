@@ -130,9 +130,15 @@ function updatePhotoExportStatus(id, exported) {
 }
 
 // 获取未导出的照片数量
-function getUnexportedPhotosCount() {
+function getUnexportedPhotosCount(username) {
     const photos = readPhotos();
-    return photos.filter(photo => photo.exported !== true).length;
+    if (username) {
+        // 只返回指定用户的未导出照片数量
+        return photos.filter(photo => photo.exported !== true && photo.username === username).length;
+    } else {
+        // 返回所有用户的未导出照片数量
+        return photos.filter(photo => photo.exported !== true).length;
+    }
 }
 
 // 更新照片信息

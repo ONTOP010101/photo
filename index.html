@@ -1036,9 +1036,18 @@
         // 获取后台未导出数量
         async function getUnexportedCount() {
             try {
-                const response = await fetch('/api/photos/unexported');
+                console.log('getUnexportedCount called, username:', username);
+                // 构建请求URL，包含当前用户名
+                let url = '/api/photos/unexported';
+                if (username) {
+                    url += `?username=${encodeURIComponent(username)}`;
+                }
+                console.log('Request URL:', url);
+                const response = await fetch(url);
+                console.log('Response status:', response.status);
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('Response data:', data);
                     const unexportedCountValue = document.getElementById('unexportedCountValue');
                     if (unexportedCountValue) {
                         unexportedCountValue.textContent = data.count || 0;
@@ -1437,7 +1446,12 @@
                         // 获取未导出的照片数量
                         let unexportedCount = 0;
                         try {
-                            const response = await fetch('/api/photos/unexported');
+                            // 构建请求URL，包含当前用户名
+                            let url = '/api/photos/unexported';
+                            if (username) {
+                                url += `?username=${encodeURIComponent(username)}`;
+                            }
+                            const response = await fetch(url);
                             if (response.ok) {
                                 const data = await response.json();
                                 unexportedCount = data.count || 0;

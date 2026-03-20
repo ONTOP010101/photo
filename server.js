@@ -162,7 +162,14 @@ app.get('/api/photos', (req, res) => {
 // 获取未导出的照片数量
 app.get('/api/photos/unexported', (req, res) => {
     try {
-        const count = storageManager.getUnexportedPhotosCount();
+        // 直接从req.query获取username
+        const username = req.query.username;
+        // 写入日志到文件
+        const fs = require('fs');
+        const logMessage = `[${new Date().toISOString()}] Received unexported count request: username=${username}, query=${JSON.stringify(req.query)}\n`;
+        fs.appendFileSync('server.log', logMessage);
+        const count = storageManager.getUnexportedPhotosCount(username);
+        fs.appendFileSync('server.log', `[${new Date().toISOString()}] Calculated count: ${count}\n`);
         res.json({ count });
     } catch (error) {
         console.error('获取未导出照片数量失败:', error);
