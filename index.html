@@ -652,7 +652,7 @@
                     <label for="suffix">后缀：</label>
                     <input type="text" id="suffix" placeholder="例如：1 或 -1" required>
                     <div class="prefix-suggestions" style="margin-top: 8px;">
-                        <button type="button" class="suggestion-btn" onclick="document.getElementById('suffix').value = '1'">1</button>
+                        <button type="button" class="suggestion-btn" onclick="document.getElementById('suffix').value = '0'">0</button>
                         <button type="button" class="suggestion-btn" onclick="document.getElementById('suffix').value = '-1'">-1</button>
                         <button type="button" class="suggestion-btn" onclick="document.getElementById('suffix').value = '(1)'">(1)</button>
                     </div>
@@ -664,6 +664,11 @@
                     <button id="shareBtn" style="width: 100%; padding: 16px; font-size: 18px; font-weight: 600; background: linear-gradient(135deg, #9b59b6, #8e44ad); color: white; border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
                         <i class="fas fa-users" style="margin-right: 10px;"></i>加入/创建共享房间
                     </button>
+                    <!-- 后台未导出数量 -->
+                    <div id="unexportedCount" style="padding: 10px 16px; background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; border-radius: 20px; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); height: 36px; margin-top: 10px; white-space: nowrap;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>后台未导出数量: <span id="unexportedCountValue">0</span></span>
+                    </div>
                     <!-- 共享房间状态 -->
                     <div id="shareRoomStatus" style="padding: 10px 16px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 20px; font-size: 12px; font-weight: 600; display: none; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); height: 36px; margin-top: 10px; white-space: nowrap;">
                         <i class="fas fa-users"></i>
@@ -871,10 +876,33 @@
             token = localStorage.getItem('token');
             username = localStorage.getItem('username');
             currentShareCode = localStorage.getItem('currentShareCode');
-            currentSection = localStorage.getItem('currentSection') || 'auth';
-            productCode = localStorage.getItem('productCode') || '';
-            suffix = localStorage.getItem('suffix') || '';
-            currentNumber = parseInt(localStorage.getItem('currentNumber')) || 1;
+            
+            // 尝试读取应用状态
+            const savedState = localStorage.getItem('appState');
+            if (savedState) {
+                try {
+                    const state = JSON.parse(savedState);
+                    currentSection = state.currentSection || 'auth';
+                    productCode = state.productCode || '';
+                    suffix = state.suffix || '';
+                    currentNumber = parseInt(state.currentNumber) || 1;
+                    console.log('从localStorage读取了应用状态');
+                } catch (e) {
+                    console.error('解析应用状态失败:', e);
+                    // 使用默认值
+                    currentSection = 'auth';
+                    productCode = '';
+                    suffix = '';
+                    currentNumber = 1;
+                }
+            } else {
+                // 使用默认值
+                currentSection = 'auth';
+                productCode = '';
+                suffix = '';
+                currentNumber = 1;
+                console.log('localStorage中没有应用状态数据');
+            }
             
             // 尝试读取已拍摄的照片
             const savedPhotos = localStorage.getItem('capturedPhotos');
@@ -904,6 +932,10 @@
         } catch (error) {
             console.error('localStorage访问被阻止:', error);
             // 忽略错误，继续使用默认值
+            currentSection = 'auth';
+            productCode = '';
+            suffix = '';
+            currentNumber = 1;
             capturedPhotos = [];
         }
         
@@ -920,44 +952,36 @@
         // 保存页面状态到localStorage
         function saveState() {
             try {
-                localStorage.setItem('currentSection', currentSection);
-                localStorage.setItem('productCode', productCode);
-                localStorage.setItem('suffix', suffix);
-                localStorage.setItem('currentNumber', currentNumber.toString());
-                // 保存已拍摄的照片
+                // 只存储必要的数据
+                const state = {
+                    currentSection: currentSection,
+                    productCode: productCode,
+                    suffix: suffix,
+                    currentNumber: currentNumber
+                };
+                
+                // 检查 localStorage 容量
+                const stateString = JSON.stringify(state);
+                if (stateString.length > 50000) { // 限制存储大小
+                    console.warn('状态数据过大，部分数据可能无法保存');
+                }
+                
+                localStorage.setItem('appState', stateString);
+                
+                // 单独存储照片数据，避免占用过多空间
                 if (capturedPhotos && capturedPhotos.length > 0) {
-                    console.log('准备保存', capturedPhotos.length, '张照片到localStorage');
+                    // 只存储最近的几张照片
+                    const recentPhotos = capturedPhotos.slice(-5); // 只保存最近5张
+                    const photosString = JSON.stringify(recentPhotos);
                     
-                    // 检查localStorage容量
-                    const testData = JSON.stringify(capturedPhotos);
-                    console.log('照片数据大小:', testData.length, 'bytes');
-                    
-                    // 尝试保存
-                    localStorage.setItem('capturedPhotos', testData);
-                    console.log('保存了', capturedPhotos.length, '张照片到localStorage');
-                    
-                    // 验证保存是否成功
-                    const savedPhotos = localStorage.getItem('capturedPhotos');
-                    if (savedPhotos) {
-                        try {
-                            const parsedPhotos = JSON.parse(savedPhotos);
-                            console.log('验证保存结果:', parsedPhotos.length, '张照片');
-                            // 验证每张照片是否都有完整的数据
-                            parsedPhotos.forEach((photo, index) => {
-                                if (photo.url) {
-                                    console.log('照片', index, '有完整的url数据');
-                                } else {
-                                    console.log('照片', index, '缺少url数据');
-                                }
-                            });
-                        } catch (e) {
-                            console.error('解析保存的照片数据失败:', e);
-                            // 保存失败时不要清空照片列表，保持当前照片
-                        }
+                    if (photosString.length > 100000) { // 限制照片数据大小
+                        console.warn('照片数据过大，只保存最近3张');
+                        const limitedPhotos = capturedPhotos.slice(-3);
+                        localStorage.setItem('capturedPhotos', JSON.stringify(limitedPhotos));
                     } else {
-                        console.error('保存照片数据失败：localStorage返回null');
-                        // 保存失败时不要清空照片列表，保持当前照片
+                        localStorage.setItem('capturedPhotos', photosString);
                     }
+                    console.log('保存了', recentPhotos.length, '张照片到localStorage');
                 } else {
                     localStorage.setItem('capturedPhotos', JSON.stringify([]));
                     console.log('保存了空照片列表到localStorage');
@@ -1009,60 +1033,106 @@
             };
         }
         
+        // 获取后台未导出数量
+        async function getUnexportedCount() {
+            try {
+                const response = await fetch('/api/photos/unexported');
+                if (response.ok) {
+                    const data = await response.json();
+                    const unexportedCountValue = document.getElementById('unexportedCountValue');
+                    if (unexportedCountValue) {
+                        unexportedCountValue.textContent = data.count || 0;
+                    }
+                }
+            } catch (error) {
+                console.error('获取未导出数量失败:', error);
+            }
+        }
+        
         // 当DOM加载完成后获取元素
         document.addEventListener('DOMContentLoaded', function() {
-            // 阻止下拉刷新
-            preventPullToRefresh();
-            
-            // 获取DOM元素
-            productCodeInput = document.getElementById('productCode');
-            suffixInput = document.getElementById('suffix');
-            startCameraBtn = document.getElementById('startCameraBtn');
-            systemCameraInput = document.getElementById('systemCameraInput');
-            capturedImageEl = document.getElementById('capturedImage');
-            uploadPhotoBtn = document.getElementById('uploadPhoto');
-            continueCameraBtn = document.getElementById('continueCamera');
-            backToFormBtn = document.getElementById('backToForm');
-            cropPhotoBtn = document.getElementById('cropPhoto');
-            optionsSection = document.querySelector('.options-section');
-            previewSection = document.querySelector('.preview-section');
-            clearInputsBtn = document.getElementById('clearInputsBtn');
-            
-            // 登录相关元素
-            authSection = document.querySelector('.auth-section');
-            loginUsername = document.getElementById('loginUsername');
-            loginPassword = document.getElementById('loginPassword');
-            loginBtn = document.getElementById('loginBtn');
-            logoutBtn = document.getElementById('logoutBtn');
-            
-            // 设置表单值
-            productCodeInput.value = productCode;
-            suffixInput.value = suffix;
-            
-            // 创建防抖版的saveState函数
-            const debouncedSaveState = debounce(saveState, 300);
-            
-            // 监听后缀输入变化，保存到localStorage（防抖处理）
-            suffixInput.addEventListener('input', function() {
-                suffix = suffixInput.value;
-                debouncedSaveState();
-            });
-            
-            // 监听货号输入变化，保存到localStorage（防抖处理）
-            productCodeInput.addEventListener('input', function() {
-                productCode = productCodeInput.value;
-                debouncedSaveState();
-            });
-            
-            // 共享相关元素
-            scanQRCodeBtn = document.getElementById('scanQRCodeBtn');
-            leaveRoomBtn = document.getElementById('leaveRoomBtn');
-            
-            // 绑定事件监听器
-            bindEventListeners();
-            
-            // 初始检查登录状态
-            checkLoginStatus();
+            try {
+                // 阻止下拉刷新
+                preventPullToRefresh();
+                
+                // 获取DOM元素
+                productCodeInput = document.getElementById('productCode');
+                suffixInput = document.getElementById('suffix');
+                startCameraBtn = document.getElementById('startCameraBtn');
+                systemCameraInput = document.getElementById('systemCameraInput');
+                capturedImageEl = document.getElementById('capturedImage');
+                uploadPhotoBtn = document.getElementById('uploadPhoto');
+                continueCameraBtn = document.getElementById('continueCamera');
+                backToFormBtn = document.getElementById('backToForm');
+                cropPhotoBtn = document.getElementById('cropPhoto');
+                optionsSection = document.querySelector('.options-section');
+                previewSection = document.querySelector('.preview-section');
+                clearInputsBtn = document.getElementById('clearInputsBtn');
+                
+                // 登录相关元素
+                authSection = document.querySelector('.auth-section');
+                loginUsername = document.getElementById('loginUsername');
+                loginPassword = document.getElementById('loginPassword');
+                loginBtn = document.getElementById('loginBtn');
+                logoutBtn = document.getElementById('logoutBtn');
+                
+                // 检查元素是否存在
+                if (!productCodeInput) console.error('productCodeInput not found');
+                if (!suffixInput) console.error('suffixInput not found');
+                if (!optionsSection) console.error('optionsSection not found');
+                
+                // 设置表单值
+                if (productCodeInput) productCodeInput.value = productCode;
+                if (suffixInput) suffixInput.value = suffix;
+                
+                // 创建防抖版的saveState函数
+                const debouncedSaveState = debounce(saveState, 300);
+                
+                // 监听后缀输入变化，保存到localStorage（防抖处理）
+                if (suffixInput) {
+                    suffixInput.addEventListener('input', function() {
+                        suffix = suffixInput.value;
+                        debouncedSaveState();
+                    });
+                }
+                
+                // 监听货号输入变化，保存到localStorage（防抖处理）
+                if (productCodeInput) {
+                    productCodeInput.addEventListener('input', function() {
+                        productCode = productCodeInput.value;
+                        debouncedSaveState();
+                    });
+                }
+                
+                // 共享相关元素
+                scanQRCodeBtn = document.getElementById('scanQRCodeBtn');
+                leaveRoomBtn = document.getElementById('leaveRoomBtn');
+                
+                // 绑定事件监听器
+                bindEventListeners();
+                
+                // 初始检查登录状态
+                checkLoginStatus();
+                
+                console.log('DOM初始化完成');
+            } catch (error) {
+                console.error('DOM初始化错误:', error);
+                // 强制显示选项界面
+                try {
+                    // 即使DOM元素获取失败，也要尝试显示选项界面
+                    const optionsSection = document.querySelector('.options-section');
+                    const authSection = document.querySelector('.auth-section');
+                    const previewSection = document.querySelector('.preview-section');
+                    const productCodeInput = document.getElementById('productCode');
+                    
+                    if (optionsSection) optionsSection.style.display = 'block';
+                    if (authSection) authSection.style.display = 'none';
+                    if (previewSection) previewSection.style.display = 'none';
+                    if (productCodeInput) productCodeInput.focus();
+                } catch (e) {
+                    console.error('强制显示选项界面失败:', e);
+                }
+            }
         });
         
         // 监听页面刷新事件，保存状态
@@ -1083,7 +1153,7 @@
         function bindEventListeners() {
             // 登录按钮点击事件
             if (loginBtn) {
-                loginBtn.addEventListener('click', () => {
+                loginBtn.addEventListener('click', async () => {
                     const loginUsernameValue = loginUsername.value.trim();
                     const loginPasswordValue = loginPassword.value.trim();
                     
@@ -1092,22 +1162,22 @@
                         return;
                     }
                     
-                    fetch('/api/auth/login', {
+                    // 发送登录请求
+                    try {
+                        const response = await fetch('/api/auth/login', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({ username: loginUsernameValue, password: loginPasswordValue })
-                        })
-                    .then(response => {
+                        });
+                        
                         if (!response.ok) {
-                            return response.json().then(errorData => {
-                                throw new Error(errorData.error || '登录失败');
-                            });
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || '登录失败');
                         }
-                        return response.json();
-                    })
-                    .then(result => {
+                        
+                        const result = await response.json();
                         // 存储用户信息
                         try {
                             localStorage.setItem('username', result.user.username);
@@ -1125,12 +1195,11 @@
                         
                         alert('登录成功！');
                         checkLoginStatus();
-                    })
-                    .catch(error => {
+                    } catch (error) {
                         console.error('登录失败:', error);
                         console.error('错误堆栈:', error.stack);
-                        alert(`登录失败: ${error.message}\n错误详情: ${JSON.stringify(error)}`);
-                    });
+                        alert(`登录失败: ${error.message}`);
+                    }
                 });
             }
             
@@ -1171,21 +1240,41 @@
             if (startCameraBtn) {
                 startCameraBtn.addEventListener('click', () => {
                     // 获取表单值
-                    productCode = productCodeInput.value.trim();
-                    suffix = suffixInput.value.trim();
-                    currentNumber = 1; // 默认起始编号为1
+                    const newProductCode = productCodeInput.value.trim();
+                    let newSuffix = suffixInput.value.trim();
                     
                     // 验证表单
-                    if (!productCode) {
+                    if (!newProductCode) {
                         alert('请输入货号');
                         return;
                     }
-                    if (!suffix) {
+                    if (!newSuffix) {
                         alert('请输入后缀');
                         return;
                     }
                     
-                    // 清空输入框（保留后缀）
+                    // 将"0"视为空后缀
+                    if (newSuffix === '0') {
+                        newSuffix = '';
+                    }
+                    
+                    // 每次操作都是新的一组，重置所有参数
+                    productCode = newProductCode;
+                    suffix = newSuffix;
+                    // 根据后缀类型设置起始编号
+                    if (suffix.includes('(') && suffix.includes(')')) {
+                        // 括号后缀，如(1)，起始编号为1
+                        currentNumber = 1;
+                    } else if (suffix) {
+                        // 普通后缀，如-1，起始编号为-1
+                        currentNumber = -1;
+                    } else {
+                        // 无后缀，起始编号为1
+                        currentNumber = 1;
+                    }
+                    capturedPhotos = []; // 清空照片列表
+                    
+                    // 清空输入框
                     productCodeInput.value = '';
                     
                     // 存储参数到localStorage
@@ -1242,12 +1331,21 @@
                         let uploadedFiles = [];
                         let totalUploaded = 0;
                         
+                        // 为整个批次生成唯一的批次ID，确保每次操作都是唯一的一组
+                        const batchId = Date.now().toString() + '-' + Math.floor(Math.random() * 1000000).toString() + '-' + Math.random().toString(36).substr(2, 9);
+                        // 组命名按货号+批次ID，确保每次操作都是独立的一组
+                        const uniqueProductCode = productCode + '-' + batchId;
+                        
                         // 并行上传所有照片
                         const uploadPromises = capturedPhotos.map(async (photo, index) => {
                             try {
+                                
                                 // 创建FormData
                                 const formData = new FormData();
-                                formData.append('productCode', productCode);
+                                // 使用唯一货号作为productCode，确保每次上传都是独立的一组
+                                formData.append('productCode', uniqueProductCode); // 唯一货号
+                                formData.append('suffix', suffix); // 添加后缀
+                                formData.append('batchId', batchId); // 添加批次ID
                                 formData.append('username', username || 'unknown');
                                 if (currentShareCode) {
                                     formData.append('shareCode', currentShareCode);
@@ -1263,8 +1361,14 @@
                                     const byteArray = new Uint8Array(byteNumbers);
                                     return new Blob([byteArray], { type: mimeType || 'image/jpeg' });
                                 }
+                                // 为后端上传生成唯一的文件名，避免覆盖
+                                const uniqueFilename = suffix ? photo.filename.replace('.jpg', '_' + Date.now() + '.jpg') : `${productCode}_${Date.now()}.jpg`;
                                 const blob = base64ToBlob(photo.url, 'image/jpeg');
-                                formData.append('photo', blob, photo.filename);
+                                formData.append('photo', blob, uniqueFilename);
+                                // 添加显示文件名，只包含货号和后缀
+                                formData.append('displayFilename', photo.filename.replace('.jpg', ''));
+                                // 添加显示名称，只包含货号
+                                formData.append('displayName', productCode);
                                 
                                 // 发送到后端API
                                 console.log('开始上传照片:', photo.filename);
@@ -1324,19 +1428,35 @@
                         // 隐藏上传进度条
                         uploadProgress.style.display = 'none';
                         
-                        // 显示上传结果
+                        // 获取未导出的照片数量
+                        let unexportedCount = 0;
+                        try {
+                            const response = await fetch('/api/photos/unexported');
+                            if (response.ok) {
+                                const data = await response.json();
+                                unexportedCount = data.count || 0;
+                            }
+                        } catch (error) {
+                            console.error('获取未导出数量失败:', error);
+                        }
+                        
+                        // 显示上传结果和未导出数量
                         if (successCount === capturedPhotos.length) {
-                            alert(`成功上传 ${successCount} 张照片！\n文件: ${uploadedFiles.join(', ')}`);
+                            alert(`成功上传 ${successCount} 张照片！\n文件: ${uploadedFiles.join(', ')}\n\n后台未导出数量: ${unexportedCount}`);
                         } else if (successCount > 0) {
-                            alert(`部分上传成功: ${successCount}/${capturedPhotos.length} 张照片\n成功: ${uploadedFiles.join(', ')}`);
+                            alert(`部分上传成功: ${successCount}/${capturedPhotos.length} 张照片\n成功: ${uploadedFiles.join(', ')}\n\n后台未导出数量: ${unexportedCount}`);
                         } else {
                             alert('上传失败，请重试');
                         }
                         
+                        // 上传完成后更新后台未导出数量
+                        getUnexportedCount();
+                        
+                        // 重置所有参数，准备下一组操作
                         // 重置系统相机输入
-                        systemCameraInput.value = '';
+                        if (systemCameraInput) systemCameraInput.value = '';
                         capturedImage = null;
-                        capturedImageEl.src = '';
+                        if (capturedImageEl) capturedImageEl.src = '';
                         capturedPhotos = [];
                         currentNumber = 1;
                         
@@ -1346,16 +1466,23 @@
                         // 保存状态
                         saveState();
                         
-                        // 返回输入货号的界面
+                        // 返回输入货号的界面，自动聚焦到货号输入框
                         backToForm();
+                        
+                        // 延迟聚焦，确保界面已切换
+                        setTimeout(() => {
+                            if (productCodeInput) {
+                                productCodeInput.focus();
+                            }
+                        }, 100);
                     } catch (error) {
                         console.error('上传失败:', error);
                         alert('上传失败，请重试');
                         // 隐藏上传进度条
-                        document.getElementById('uploadProgress').style.display = 'none';
-                    } finally {
+                        const uploadProgress = document.getElementById('uploadProgress');
+                        if (uploadProgress) uploadProgress.style.display = 'none';
                         // 启用上传按钮
-                        uploadPhotoBtn.disabled = false;
+                        if (uploadPhotoBtn) uploadPhotoBtn.disabled = false;
                     }
                 });
             }
@@ -1450,67 +1577,84 @@
         
         // 检查登录状态
         function checkLoginStatus() {
-            if (username) {
-                // 已登录，根据currentSection显示相应界面
-                authSection.style.display = 'none';
-                
-                // 如果有照片，优先显示预览界面
-                if (capturedPhotos.length > 0) {
-                    optionsSection.style.display = 'none';
-                    previewSection.style.display = 'block';
-                    // 更新照片列表
-                    updatePhotoGallery();
-                    // 更新预览图
-                    if (capturedImage) {
-                        capturedImageEl.src = capturedImage;
+            try {
+                if (username) {
+                    // 已登录，根据currentSection显示相应界面
+                    if (authSection) authSection.style.display = 'none';
+                    
+                    // 验证 currentSection 值
+                    if (!['options', 'preview'].includes(currentSection)) {
+                        currentSection = 'options';
                     }
-                    currentSection = 'preview';
-                } else if (currentSection === 'options') {
-                    optionsSection.style.display = 'block';
-                    previewSection.style.display = 'none';
-                } else if (currentSection === 'preview') {
-                    optionsSection.style.display = 'none';
-                    previewSection.style.display = 'block';
-                    // 更新照片列表
-                    updatePhotoGallery();
-                    // 更新预览图
-                    if (capturedImage) {
-                        capturedImageEl.src = capturedImage;
+                    
+                    // 如果有照片，优先显示预览界面
+                    if (capturedPhotos.length > 0) {
+                        if (optionsSection) optionsSection.style.display = 'none';
+                        if (previewSection) previewSection.style.display = 'block';
+                        // 更新照片列表
+                        updatePhotoGallery();
+                        // 更新预览图
+                        if (capturedImage && capturedImageEl) {
+                            capturedImageEl.src = capturedImage;
+                        }
+                        currentSection = 'preview';
+                    } else {
+                        // 没有照片时，始终显示选项界面
+                        if (optionsSection) optionsSection.style.display = 'block';
+                        if (previewSection) previewSection.style.display = 'none';
+                        currentSection = 'options';
+                        // 确保货号输入框获得焦点
+                        setTimeout(() => {
+                            if (productCodeInput) {
+                                productCodeInput.focus();
+                            }
+                            // 获取后台未导出数量
+                            getUnexportedCount();
+                        }, 100);
+                    }
+                    
+                    // 保存状态
+                    saveState();
+                    
+                    // 检查是否有共享房间信息
+                    if (currentShareCode) {
+                        // 获取共享房间信息
+                        fetch(`/api/auth/user-shares/${username}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                const shares = data.shares || [];
+                                const currentShare = shares.find(s => s.code === currentShareCode);
+                                if (currentShare) {
+                                    currentShareInfo = currentShare;
+                                }
+                                updateShareRoomStatus();
+                            })
+                            .catch(error => {
+                                console.error('获取共享房间信息失败:', error);
+                            });
                     }
                 } else {
-                    // 默认显示选项界面
-                    optionsSection.style.display = 'block';
-                    previewSection.style.display = 'none';
-                    currentSection = 'options';
+                    // 未登录，显示登录界面
+                    if (authSection) authSection.style.display = 'block';
+                    if (optionsSection) optionsSection.style.display = 'none';
+                    if (previewSection) previewSection.style.display = 'none';
+                    currentSection = 'auth';
+                    saveState();
                 }
-                
-                // 保存状态
+            } catch (error) {
+                console.error('检查登录状态失败:', error);
+                // 出错时强制显示选项界面
+                if (optionsSection) optionsSection.style.display = 'block';
+                if (authSection) authSection.style.display = 'none';
+                if (previewSection) previewSection.style.display = 'none';
+                currentSection = 'options';
                 saveState();
-                
-                // 检查是否有共享房间信息
-                if (currentShareCode) {
-                    // 获取共享房间信息
-                    fetch(`/api/auth/user-shares/${username}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            const shares = data.shares || [];
-                            const currentShare = shares.find(s => s.code === currentShareCode);
-                            if (currentShare) {
-                                currentShareInfo = currentShare;
-                            }
-                            updateShareRoomStatus();
-                        })
-                        .catch(error => {
-                            console.error('获取共享房间信息失败:', error);
-                        });
-                }
-            } else {
-                // 未登录，显示登录界面
-                authSection.style.display = 'block';
-                optionsSection.style.display = 'none';
-                previewSection.style.display = 'none';
-                currentSection = 'auth';
-                saveState();
+                // 确保货号输入框获得焦点
+                setTimeout(() => {
+                    if (productCodeInput) {
+                        productCodeInput.focus();
+                    }
+                }, 100);
             }
         }
         
@@ -1536,20 +1680,14 @@
                     // 正常模式：生成新文件名
                     // 检查后缀是否包含括号
                     if (suffix.includes('(') && suffix.includes(')')) {
-                        // 处理括号后缀，如（1）（2）（3）
-                        const match = suffix.match(/\((\d+)\)/);
-                        if (match) {
-                            // 提取括号内的数字作为起始编号
-                            const baseSuffix = suffix.replace(/\(\d+\)/, '');
-                            filename = `${productCode}${baseSuffix}(${currentNumber}).jpg`;
-                        } else {
-                            // 没有数字的情况
-                            filename = `${productCode}${suffix}(${currentNumber}).jpg`;
-                        }
+                        // 处理括号后缀，如(1)，生成货号(1)、货号(2)等
+                        filename = `${productCode}(${currentNumber}).jpg`;
+                    } else if (suffix) {
+                        // 处理普通后缀，如-1，生成货号-1、货号-2等
+                        filename = `${productCode}${currentNumber}.jpg`;
                     } else {
-                        // 处理普通后缀，如1 2 3 或 -1 -2 -3
-                        const baseSuffix = suffix.replace(/\d+$/, '');
-                        filename = `${productCode}${baseSuffix}${currentNumber}.jpg`;
+                        // 无后缀，生成货号.jpg
+                        filename = `${productCode}.jpg`;
                     }
                 }
                 
@@ -1574,11 +1712,39 @@
                     if (!existingPhoto) {
                         // 添加到已拍摄照片列表
                         capturedPhotos.push(photo);
-                        // 递增编号
-                        currentNumber++;
+                        // 根据后缀类型更新编号
+                        if (suffix.includes('(') && suffix.includes(')')) {
+                            // 括号后缀，递增编号：1, 2, 3, 4...
+                            currentNumber++;
+                        } else if (suffix) {
+                            // 普通后缀，递减编号：-1, -2, -3, -4...
+                            currentNumber--;
+                        }
+                        // 无后缀时，不更新编号，因为文件名中不包含编号
                         console.log('添加了新照片，当前照片数量:', capturedPhotos.length);
                     } else {
-                        console.log('照片已存在，文件名:', photo.filename);
+                        // 即使文件名相同，也添加为新照片（为不同物品）
+                        // 生成带时间戳的唯一文件名
+                        const timestamp = Date.now();
+                        if (suffix.includes('(') && suffix.includes(')')) {
+                            filename = `${productCode}(${currentNumber})_${timestamp}.jpg`;
+                        } else if (suffix) {
+                            filename = `${productCode}${currentNumber}_${timestamp}.jpg`;
+                        } else {
+                            filename = `${productCode}_${timestamp}.jpg`;
+                        }
+                        photo.filename = filename;
+                        capturedPhotos.push(photo);
+                        // 根据后缀类型更新编号
+                        if (suffix.includes('(') && suffix.includes(')')) {
+                            // 括号后缀，递增编号：1, 2, 3, 4...
+                            currentNumber++;
+                        } else if (suffix) {
+                            // 普通后缀，递减编号：-1, -2, -3, -4...
+                            currentNumber--;
+                        }
+                        // 无后缀时，不更新编号，因为文件名中不包含编号
+                        console.log('添加了新照片（文件名已存在，使用时间戳），当前照片数量:', capturedPhotos.length);
                     }
                 }
                 
@@ -1655,171 +1821,7 @@
             openCropModal();
         }
         
-        // 上传照片
-        if (uploadPhotoBtn) {
-        uploadPhotoBtn.addEventListener('click', async () => {
-            if (capturedPhotos.length === 0) {
-                alert('请先拍摄照片');
-                return;
-            }
-            
-            try {
-                // 显示上传进度条
-                const uploadProgress = document.getElementById('uploadProgress');
-                const uploadProgressBar = document.getElementById('uploadProgressBar');
-                const uploadProgressText = document.getElementById('uploadProgressText');
-                uploadProgress.style.display = 'block';
-                uploadProgressBar.style.width = '0%';
-                uploadProgressText.textContent = '0%';
-                
-                // 禁用上传按钮
-                uploadPhotoBtn.disabled = true;
-                
-                console.log('准备上传的照片:', capturedPhotos);
-                console.log('当前登录用户:', username);
-                console.log('当前共享码:', currentShareCode);
-                
-                // 批量上传所有照片
-                let successCount = 0;
-                let uploadedFiles = [];
-                let totalUploaded = 0;
-                
-                // 并行上传所有照片
-                const uploadPromises = capturedPhotos.map(async (photo, index) => {
-                    try {
-                        // 创建FormData
-                        const formData = new FormData();
-                        formData.append('productCode', productCode);
-                        formData.append('username', username || 'unknown');
-                        if (currentShareCode) {
-                            formData.append('shareCode', currentShareCode);
-                        }
-                        
-                        // 将base64转换为Blob
-                        function base64ToBlob(base64, mimeType) {
-                            const byteCharacters = atob(base64.split(',')[1]);
-                            const byteNumbers = new Array(byteCharacters.length);
-                            for (let i = 0; i < byteCharacters.length; i++) {
-                                byteNumbers[i] = byteCharacters.charCodeAt(i);
-                            }
-                            const byteArray = new Uint8Array(byteNumbers);
-                            return new Blob([byteArray], { type: mimeType || 'image/jpeg' });
-                        }
-                        const blob = base64ToBlob(photo.url, 'image/jpeg');
-                        formData.append('photo', blob, photo.filename);
-                        
-                        // 发送到后端API
-                        console.log('开始上传照片:', photo.filename);
-                        console.log('上传请求URL:', window.location.origin + '/api/photos');
-                        
-                        try {
-                            // 添加超时设置
-                            const controller = new AbortController();
-                            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时
 
-                            const res = await fetch('http://192.168.40.252:3000/api/photos', {
-                                method: 'POST',
-                                body: formData,
-                                signal: controller.signal
-                            });
-
-                            clearTimeout(timeoutId);
-                            
-                            console.log(`上传响应状态: ${res.status} ${res.statusText}`);
-                            console.log(`上传响应URL: ${res.url}`);
-                            
-                            if (res.ok) {
-                                successCount++;
-                                uploadedFiles.push(photo.filename);
-                                console.log(`成功上传: ${photo.filename}`);
-                            } else {
-                                console.log(`上传失败: ${photo.filename}`);
-                                // 尝试获取错误信息
-                                try {
-                                    const errorData = await res.json();
-                                    console.log(`上传错误信息:`, errorData);
-                                } catch (e) {
-                                    console.log(`无法解析错误信息:`, e);
-                                }
-                            }
-                        } catch (err) {
-                            console.error(`上传 ${photo.filename} 失败:`, err);
-                            console.error(`错误堆栈:`, err.stack);
-                        }
-                    } catch (err) {
-                        console.error(`上传 ${photo.filename} 失败:`, err);
-                    } finally {
-                        // 更新进度
-                        totalUploaded++;
-                        const progress = Math.round((totalUploaded / capturedPhotos.length) * 100);
-                        uploadProgressBar.style.width = `${progress}%`;
-                        uploadProgressText.textContent = `${progress}% (${totalUploaded}/${capturedPhotos.length})`;
-                    }
-                });
-                
-                // 等待所有上传完成
-                await Promise.all(uploadPromises);
-                
-                console.log('批量上传完成:', successCount, '张成功');
-                console.log('上传的文件:', uploadedFiles);
-                
-                // 隐藏上传进度条
-                uploadProgress.style.display = 'none';
-                
-                // 显示上传结果
-                if (successCount === capturedPhotos.length) {
-                    alert(`成功上传 ${successCount} 张照片！\n文件: ${uploadedFiles.join(', ')}`);
-                } else if (successCount > 0) {
-                    alert(`部分上传成功: ${successCount}/${capturedPhotos.length} 张照片\n成功: ${uploadedFiles.join(', ')}`);
-                } else {
-                    alert('上传失败，请重试');
-                }
-                
-                // 重置系统相机输入
-                systemCameraInput.value = '';
-                capturedImage = null;
-                capturedImageEl.src = '';
-                capturedPhotos = [];
-                
-                // 清空照片列表
-                updatePhotoGallery();
-                
-                // 返回输入货号的界面
-                backToForm();
-            } catch (error) {
-                console.error('上传失败:', error);
-                alert('上传失败，请重试');
-                // 隐藏上传进度条
-                document.getElementById('uploadProgress').style.display = 'none';
-            } finally {
-                // 启用上传按钮
-                uploadPhotoBtn.disabled = false;
-            }
-        });
-        }
-        
-        // 继续拍照按钮点击事件
-        if (continueCameraBtn) {
-            continueCameraBtn.addEventListener('click', () => {
-                // 重置系统相机输入
-                systemCameraInput.value = '';
-                capturedImage = null;
-                capturedImageEl.src = '';
-                
-                // 直接打开相机
-                systemCameraInput.click();
-            });
-        }
-        
-        // 返回表单
-        if (backToFormBtn) {
-            backToFormBtn.addEventListener('click', () => {
-                // 显示确认提示
-                if (confirm('确定要返回吗？未上传的照片将会丢失。')) {
-                    backToForm();
-                }
-            });
-        }
         
         // 打开共享模态框
         function openShareModal() {
@@ -2372,13 +2374,14 @@
             
             alert('裁剪成功！');
         }
-            
-            // 返回表单
-            function backToForm() {
+        
+        // 返回表单
+        function backToForm() {
+            try {
                 // 重置系统相机输入
-                systemCameraInput.value = '';
+                if (systemCameraInput) systemCameraInput.value = '';
                 capturedImage = null;
-                capturedImageEl.src = '';
+                if (capturedImageEl) capturedImageEl.src = '';
                 capturedPhotos = [];
                 currentNumber = 1;
                 
@@ -2386,15 +2389,37 @@
                 updatePhotoGallery();
                 
                 // 隐藏预览区域，显示选项区域
-                previewSection.style.display = 'none';
-                optionsSection.style.display = 'block';
-                uploadPhotoBtn.disabled = true;
-                cropPhotoBtn.disabled = true;
+                if (previewSection) previewSection.style.display = 'none';
+                if (optionsSection) optionsSection.style.display = 'block';
+                if (uploadPhotoBtn) uploadPhotoBtn.disabled = true;
+                if (cropPhotoBtn) cropPhotoBtn.disabled = true;
+                
+                // 确保货号输入框获得焦点
+                setTimeout(() => {
+                    if (productCodeInput) {
+                        productCodeInput.focus();
+                    }
+                }, 100);
                 
                 // 更新当前section并保存状态
                 currentSection = 'options';
                 saveState();
+            } catch (error) {
+                console.error('返回表单失败:', error);
+                // 出错时强制显示选项界面
+                try {
+                    const optionsSection = document.querySelector('.options-section');
+                    const previewSection = document.querySelector('.preview-section');
+                    const productCodeInput = document.getElementById('productCode');
+                    
+                    if (optionsSection) optionsSection.style.display = 'block';
+                    if (previewSection) previewSection.style.display = 'none';
+                    if (productCodeInput) productCodeInput.focus();
+                } catch (e) {
+                    console.error('强制显示选项界面失败:', e);
+                }
             }
+        }
         
         // 处理扫码结果
         function processQRCode(data) {

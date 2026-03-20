@@ -802,10 +802,7 @@
                     <i class="fas fa-sync-alt"></i>
                     <span>刷新</span>
                 </a>
-                <a href="#" id="exportBtn">
-                    <i class="fas fa-download"></i>
-                    <span>导出</span>
-                </a>
+
                 <div class="user-info" style="color: white; font-weight: 600; margin-right: 20px; padding: 8px 16px; background: rgba(255,255,255,0.1); border-radius: 20px; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.3s ease;" onclick="openChangePasswordModal()">
                     <i class="fas fa-user"></i>
                     <span id="currentUsername">用户名</span>
@@ -927,6 +924,10 @@
                         <button class="action-btn" style="background: linear-gradient(135deg, #27ae60, #229954); color: white; box-shadow: 0 2px 5px rgba(39, 174, 96, 0.3); padding: 8px 12px; font-size: 14px;" onclick="exportToExcel()">
                             <i class="fas fa-file-excel"></i>
                             导出全部货号并插入表格
+                        </button>
+                        <button class="action-btn" style="background: linear-gradient(135deg, #9b59b6, #8e44ad); color: white; box-shadow: 0 2px 5px rgba(155, 89, 182, 0.3); padding: 8px 12px; font-size: 14px;" onclick="exportIndividualFiles()">
+                            <i class="fas fa-file-image"></i>
+                            导出单独文件图片
                         </button>
                         <button class="action-btn" style="background: #e74c3c; color: white; box-shadow: 0 2px 5px rgba(231, 76, 60, 0.3); padding: 8px 12px; font-size: 14px;" onclick="batchDeleteSelected()">
                             <i class="fas fa-trash-alt"></i>
@@ -1399,6 +1400,7 @@
             }
             
             try {
+                // 发送登录请求
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: {
@@ -1516,6 +1518,7 @@
                 window.photoSocket = socket;
             } catch (error) {
                 console.error('建立WebSocket连接失败:', error);
+                // WebSocket连接失败不影响页面的正常运行
             }
         }
         
@@ -1541,6 +1544,14 @@
         async function loadPhotos() {
             return new Promise(async (resolve, reject) => {
                 try {
+                    // 显示加载状态
+                    document.getElementById('photosContainer').innerHTML = `
+                        <div class="loading-state">
+                            <div class="loading-spinner"></div>
+                            <div class="loading-text">加载中...</div>
+                        </div>
+                    `;
+                    
                     // 获取用户的共享信息（包括已解散的房间）
                     let userShares = [];
                     let userCreatedShareCodes = [];
@@ -1566,19 +1577,16 @@
                                 }
                             } catch (error) {
                                 console.error('获取共享信息失败:', error);
+                                // 共享信息获取失败不影响照片加载
                             }
                         }
                     }
                     
                     // 获取所有照片
-                    fetch('/api/photos')
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error('加载失败');
-                            }
-                            return response.json();
-                        })
-                        .then(photos => {
+                    try {
+                        const response = await fetch('/api/photos');
+                        if (response.ok) {
+                            let photos = await response.json();
                             // 确保photos是数组
                             if (!Array.isArray(photos)) {
                                 photos = [];
@@ -1637,20 +1645,38 @@
                                 filterPhotosByExportStatus(currentStatus);
                             }
                             resolve();
-                        })
-                        .catch(error => {
-                            console.error('加载照片失败:', error);
+                        } else {
+                            // API返回错误，但服务器正常
+                            console.error('API返回错误:', response.status);
                             document.getElementById('photosContainer').innerHTML = `
                                 <div class="empty-state">
                                     <div class="empty-icon">
                                         <i class="fas fa-exclamation-circle"></i>
                                     </div>
-                                    <h3 class="empty-title">加载失败</h3>
-                                    <p class="empty-subtitle">请检查网络连接后刷新页面重试</p>
+                                    <h3 class="empty-title">API错误</h3>
+                                    <p class="empty-subtitle">服务器返回错误，请稍后重试</p>
                                 </div>
                             `;
-                            resolve(); // 即使失败也resolve，确保自动刷新继续
-                        });
+                            resolve();
+                        }
+                    } catch (apiError) {
+                        // API调用失败，可能是服务器未运行或网络问题
+                        console.error('API调用失败:', apiError);
+                        document.getElementById('photosContainer').innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <i class="fas fa-server"></i>
+                                </div>
+                                <h3 class="empty-title">服务器连接失败</h3>
+                                <p class="empty-subtitle">请检查服务器是否正在运行，然后刷新页面重试</p>
+                                <button class="action-btn primary" onclick="loadPhotos()" style="margin-top: 20px;">
+                                    <i class="fas fa-refresh"></i>
+                                    重试
+                                </button>
+                            </div>
+                        `;
+                        resolve();
+                    }
                 } catch (error) {
                     console.error('加载照片失败:', error);
                     document.getElementById('photosContainer').innerHTML = `
@@ -1660,6 +1686,10 @@
                             </div>
                             <h3 class="empty-title">加载失败</h3>
                             <p class="empty-subtitle">请检查网络连接后刷新页面重试</p>
+                            <button class="action-btn primary" onclick="loadPhotos()" style="margin-top: 20px;">
+                                <i class="fas fa-refresh"></i>
+                                重试
+                            </button>
                         </div>
                     `;
                     resolve(); // 即使失败也resolve，确保自动刷新继续
@@ -1687,6 +1717,11 @@
                 // 如果货号包含下划线，只取前面部分
                 if (productCode.includes('_')) {
                     productCode = productCode.split('_')[0];
+                }
+                // 去除批次ID
+                if (productCode.includes('-') && productCode.split('-').length > 2) {
+                    // 保留前两部分（货号+后缀），去除批次ID
+                    productCode = productCode.split('-').slice(0, 2).join('-');
                 }
                 return productCode;
             }));
@@ -1733,21 +1768,15 @@
                 currentStatus = status;
             }
             
-            // 按货号分组，确保相同货号的照片在同一组
+            // 按唯一编码分组，每个上传批次一个组
             const groupedPhotos = filteredPhotos.reduce((groups, photo) => {
                 if (!photo) return groups;
-                // 提取货号，去除可能的时间戳或其他后缀
-                let productCode = photo.productCode || '未分类';
-                // 清理货号，去除所有空格和特殊字符
-                productCode = productCode.replace(/\s+/g, '').trim();
-                // 如果货号包含下划线，只取前面部分作为分组键
-                if (productCode.includes('_')) {
-                    productCode = productCode.split('_')[0];
+                // 使用完整的productCode作为分组键，确保同一批次的照片分到同一个组
+                const groupKey = photo.productCode || '未分类';
+                if (!groups[groupKey]) {
+                    groups[groupKey] = [];
                 }
-                if (!groups[productCode]) {
-                    groups[productCode] = [];
-                }
-                groups[productCode].push(photo);
+                groups[groupKey].push(photo);
                 return groups;
             }, {});
             
@@ -1812,8 +1841,34 @@
                 const groupId = `product-group-${(sortedProductCodes.length - startIndex - index)}`;
                 let productPhotos = groupedPhotos[groupKey];
                 
-                // 从分组键中提取货号（已经在分组时处理过，直接使用）
-                const productCode = groupKey;
+                // 从分组键中提取货号和后缀，去除批次ID
+                let productCode = groupKey;
+                // 找到最后两个连字符的位置，去除时间戳和随机数
+                const hyphens = productCode.match(/-/g);
+                if (hyphens && hyphens.length >= 2) {
+                    // 找到倒数第二个连字符的位置
+                    let lastHyphenIndex = productCode.lastIndexOf('-');
+                    let secondLastHyphenIndex = productCode.lastIndexOf('-', lastHyphenIndex - 1);
+                    if (secondLastHyphenIndex > 0) {
+                        // 提取货号和后缀部分
+                        productCode = productCode.substring(0, secondLastHyphenIndex);
+                    }
+                }
+                // 清理货号，确保只显示货号部分
+                // 处理带括号的后缀，如 19(1)
+                const bracketMatch = productCode.match(/^(.*?)\(\d+\)$/);
+                if (bracketMatch) {
+                    productCode = bracketMatch[1];
+                }
+                // 处理带连字符的后缀，如 19-1
+                if (productCode.includes('-') && productCode.split('-').length === 2) {
+                    const parts = productCode.split('-');
+                    if (/^\d+$/.test(parts[1])) {
+                        productCode = parts[0];
+                    }
+                }
+                // 清理货号，确保只包含字母和数字
+                productCode = productCode.replace(/[^a-zA-Z0-9]/g, '').trim();
                 
                 // 对照片进行排序，确保按照文件名的正确顺序排列
                 productPhotos.sort((a, b) => {
@@ -1825,7 +1880,7 @@
                             return parseInt(match[1]);
                         }
                         // 尝试匹配连字符后的数字，如 -1, -2, -3
-                        const hyphenMatch = filename.match(/-(\d+)(?:\.\w+)?$/);
+                        const hyphenMatch = filename.match(/-(\d+)/);
                         if (hyphenMatch) {
                             return parseInt(hyphenMatch[1]);
                         }
@@ -1863,9 +1918,9 @@
                                 </h3>
                             </div>
                             <div class="product-actions">
-                                <button class="action-btn secondary" onclick="downloadProductPhotos('${groupKey}')">
-                                    <i class="fas fa-download"></i>
-                                    下载全部
+                                <button class="action-btn secondary" onclick="openEditProductCodeModal('${groupKey}')">
+                                    <i class="fas fa-edit"></i>
+                                    重新修改货号和后缀
                                 </button>
                                 <button class="action-btn primary" onclick="viewProductDetails('${groupKey}')">
                                     <i class="fas fa-info-circle"></i>
@@ -1898,7 +1953,7 @@
                                 </div>
                             </div>
                             <div class="photo-info">
-                                <div class="photo-filename">${photo.filename}</div>
+                                <div class="photo-filename">${photo.filename.replace(/_.*/, '')}</div>
                                 <div class="photo-meta">
                                     <span>${new Date(photo.timestamp).toLocaleDateString()}</span>
                                     <span>${new Date(photo.timestamp).toLocaleTimeString()}</span>
@@ -2095,8 +2150,25 @@
             if (!photo) return false;
             // 检查照片的货号是否在选中的分组键中
             return selectedCodes.some(groupKey => {
-                const groupProductCode = groupKey.split('_')[0];
-                return groupProductCode === photo.productCode;
+                let groupProductCode = groupKey.split('_')[0];
+                let photoProductCode = photo.productCode;
+                
+                // 提取原始货号，去除批次ID和后缀
+                if (groupProductCode.includes('-') && groupProductCode.split('-').length > 2) {
+                    groupProductCode = groupProductCode.split('-').slice(0, 2).join('-');
+                }
+                if (photoProductCode.includes('-') && photoProductCode.split('-').length > 2) {
+                    photoProductCode = photoProductCode.split('-').slice(0, 2).join('-');
+                }
+                // 提取纯货号（去除后缀）
+                if (groupProductCode.match(/^\d+-\d+$/)) {
+                    groupProductCode = groupProductCode.split('-')[0];
+                }
+                if (photoProductCode.match(/^\d+-\d+$/)) {
+                    photoProductCode = photoProductCode.split('-')[0];
+                }
+                
+                return groupProductCode.replace(/\s+/g, '') === photoProductCode.replace(/\s+/g, '');
             });
         });
         
@@ -2117,23 +2189,23 @@
         let exportCanceled = false;
         
         try {
-            // 按货号分组
+            // 按货号和批次分组，保留完整的productCode以区分不同批次
             const groupedPhotos = photosToExport.reduce((groups, photo) => {
                 if (!photo) return groups;
-                const productCode = photo.productCode || '未分类';
-                if (!groups[productCode]) {
-                    groups[productCode] = [];
+                // 使用完整的productCode作为分组键，以区分不同批次的相同货号
+                const groupKey = photo.productCode || '未分类';
+                if (!groups[groupKey]) {
+                    groups[groupKey] = [];
                 }
-                groups[productCode].push(photo);
+                groups[groupKey].push(photo);
                 return groups;
             }, {});
             
-            // 按照用户勾选的货号顺序排序
+            // 按照用户勾选的货号顺序排序，使用完整的groupKey
             const productCodes = [];
             selectedCodes.forEach(groupKey => {
-                const productCode = groupKey.split('_')[0];
-                if (!productCodes.includes(productCode)) {
-                    productCodes.push(productCode);
+                if (!productCodes.includes(groupKey)) {
+                    productCodes.push(groupKey);
                 }
             });
             
@@ -2141,6 +2213,40 @@
             productCodes.forEach(productCode => {
                 if (!groupedPhotos[productCode]) {
                     groupedPhotos[productCode] = [];
+                }
+            });
+            
+            // 统计每个纯货号的出现次数，用于检测重复（忽略大小写）
+            const productCodeCount = {};
+            productCodes.forEach(productCode => {
+                let pureProductCode = productCode;
+                // 去除时间戳、随机码和批次ID，只保留纯货号
+                // 先处理下划线分隔的情况（如 123-1_1774004192518）
+                if (pureProductCode.includes('_')) {
+                    const parts = pureProductCode.split('_');
+                    if (parts.length > 1) {
+                        pureProductCode = parts[0];
+                    }
+                }
+                
+                // 处理连字符分隔的情况，去除批次ID（如 123-1-1774004192518-abc123）
+                if (pureProductCode.includes('-')) {
+                    // 找到最后一个连字符，去除后面的批次ID
+                    const lastHyphenIndex = pureProductCode.lastIndexOf('-');
+                    if (lastHyphenIndex > 0) {
+                        const lastPart = pureProductCode.substring(lastHyphenIndex + 1);
+                        // 检查最后一部分是否为批次ID（包含数字和字母，长度大于5）
+                        if ((/^[0-9]+$/.test(lastPart) && lastPart.length >= 5) || 
+                            (/^[0-9a-zA-Z]+$/.test(lastPart) && lastPart.length > 8)) {
+                            pureProductCode = pureProductCode.substring(0, lastHyphenIndex);
+                        }
+                    }
+                }
+                // 转换为小写进行统计，忽略大小写
+                const lowerProductCode = pureProductCode.toLowerCase();
+                const count = groupedPhotos[productCode].length;
+                if (count > 0) {
+                    productCodeCount[lowerProductCode] = (productCodeCount[lowerProductCode] || 0) + count;
                 }
             });
             const totalSteps = productCodes.length;
@@ -2179,6 +2285,7 @@
             // 处理每个货号
             let rowIndex = 2; // 从第二行开始
             const imagePromises = [];
+            const failedExports = [];
             
             for (const productCode of productCodes) {
                 if (exportCanceled) {
@@ -2198,7 +2305,7 @@
                             return parseInt(match[1]);
                         }
                         // 尝试匹配连字符后的数字，如 -1, -2, -3
-                        const hyphenMatch = filename.match(/-(\d+)(?:\.\w+)?$/);
+                        const hyphenMatch = filename.match(/-(\d+)/);
                         if (hyphenMatch) {
                             return parseInt(hyphenMatch[1]);
                         }
@@ -2213,8 +2320,47 @@
                     return extractNumber(a.filename) - extractNumber(b.filename);
                 });
                 
-                // 设置货号
-                worksheet.getCell(`A${rowIndex}`).value = productCode;
+                // 设置货号，确保去除所有时间戳和随机码
+                let displayProductCode = productCode;
+                
+                // 1. 先处理下划线分隔的情况（如 123-1_736710）
+                if (displayProductCode.includes('_')) {
+                    const parts = displayProductCode.split('_');
+                    if (parts.length > 1) {
+                        // 只保留下划线前的部分
+                        displayProductCode = parts[0];
+                    }
+                }
+                
+                // 2. 处理连字符分隔的情况，去除时间戳和随机码（如 Ac-1774005868573, BC-146309, Ac-1774006823873-202400-ha916j1ls）
+                if (displayProductCode.includes('-')) {
+                    // 分割货号
+                    const parts = displayProductCode.split('-');
+                    // 找到第一个非数字部分作为原始货号
+                    let originalProductCode = '';
+                    for (const part of parts) {
+                        if (!/^[0-9]+$/.test(part) && part.length < 5) {
+                            originalProductCode = part;
+                            break;
+                        }
+                    }
+                    // 如果找到了原始货号，使用它
+                    if (originalProductCode) {
+                        displayProductCode = originalProductCode;
+                    }
+                }
+                
+                // 3. 提取原始货号，去除批次ID和后缀
+                if (displayProductCode.includes('-') && displayProductCode.split('-').length > 2) {
+                    // 保留前两部分（货号+后缀），去除批次ID
+                    displayProductCode = displayProductCode.split('-').slice(0, 2).join('-');
+                }
+                // 4. 如果货号只有数字和连字符，且只有一个连字符，可能是货号+后缀
+                // 例如：111-1，只保留货号部分
+                if (displayProductCode.match(/^\d+-\d+$/)) {
+                    displayProductCode = displayProductCode.split('-')[0];
+                }
+                worksheet.getCell(`A${rowIndex}`).value = displayProductCode;
                 
                 // 设置行高
                 worksheet.getRow(rowIndex).height = 200;
@@ -2286,6 +2432,11 @@
                                         console.error(`嵌入图片 ${imageUrl} 失败:`, error);
                                         // 如果嵌入失败，显示错误信息
                                         worksheet.getCell(cellAddress).value = '图片嵌入失败';
+                                        failedExports.push({
+                                            filename: photo.filename,
+                                            productCode: photo.productCode || '未知货号',
+                                            error: error.message
+                                        });
                                         resolve();
                                     }
                                 };
@@ -2297,6 +2448,11 @@
                             console.error(`处理图片 ${imageUrl} 失败:`, error);
                             // 如果图片下载失败，显示错误信息
                             worksheet.getCell(cellAddress).value = '图片不存在';
+                            failedExports.push({
+                                filename: photo.filename,
+                                productCode: photo.productCode || '未知货号',
+                                error: error.message
+                            });
                         });
                     
                     imagePromises.push(promise);
@@ -2306,6 +2462,30 @@
                 }
                 
                 rowIndex++;
+            }
+            
+            // 处理失败的导出
+            if (failedExports.length > 0) {
+                // 创建一个新的工作表用于记录失败的导出
+                const failedWorksheet = workbook.addWorksheet('导出失败列表');
+                
+                // 设置表头
+                failedWorksheet.getCell('A1').value = '货号';
+                failedWorksheet.getCell('B1').value = '文件名';
+                failedWorksheet.getCell('C1').value = '错误信息';
+                
+                // 设置列宽
+                failedWorksheet.getColumn('A').width = 20;
+                failedWorksheet.getColumn('B').width = 40;
+                failedWorksheet.getColumn('C').width = 60;
+                
+                // 填充失败的导出记录
+                for (let i = 0; i < failedExports.length; i++) {
+                    const item = failedExports[i];
+                    failedWorksheet.getCell(`A${i + 2}`).value = item.productCode;
+                    failedWorksheet.getCell(`B${i + 2}`).value = item.filename;
+                    failedWorksheet.getCell(`C${i + 2}`).value = item.error;
+                }
             }
             
             updateExportProgress(85, '正在生成Excel文件...');
@@ -2369,7 +2549,11 @@
             // 关闭进度模态框
             setTimeout(() => {
                 closeModal('exportProgressModal');
-                alert(`成功导出 ${productCodes.length} 个货号的 ${totalPhotos} 张照片到 ${exportName}`);
+                let message = `成功导出 ${productCodes.length} 个货号的 ${totalPhotos} 张照片到 ${exportName}`;
+                if (failedExports.length > 0) {
+                    message += `\n有 ${failedExports.length} 张图片导出失败，已在Excel文件中生成"导出失败列表"工作表`;
+                }
+                alert(message);
             }, 1000);
         } catch (error) {
             console.error('导出Excel失败:', error);
@@ -2390,6 +2574,36 @@
             alert('请先选择要导出的货号');
             return;
         }
+        
+        // 收集选中的货号
+        const selectedProductCodes = Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
+        
+        // 收集所有选中货号的照片
+        const photosToExport = [];
+        filteredPhotos.forEach(photo => {
+            if (photo) {
+                // 检查照片的货号是否在选中的分组键中
+                const isSelected = selectedProductCodes.some(groupKey => {
+                    const groupProductCode = groupKey.split('_')[0];
+                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
+                });
+                if (isSelected) {
+                    photosToExport.push(photo);
+                }
+            }
+        });
+        
+        if (photosToExport.length === 0) {
+            alert('选中的货号没有照片');
+            return;
+        }
+        
+        // 显示选中的货号和图片数量
+        alert(`已选择 ${selectedProductCodes.length} 个货号，共 ${photosToExport.length} 张图片`);
+        
+        // 保存选中的照片
+        window.selectedBatchPhotos = photosToExport;
+        window.exportType = 'normal'; // 标记为普通导出
         
         // 弹出命名模态框
         document.getElementById('exportNameModal').classList.add('active');
@@ -2453,7 +2667,7 @@
                 // 检查照片的货号是否在选中的分组键中
                 return selectedCodes.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
-                    return groupProductCode === photo.productCode;
+                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
                 });
             });
         }
@@ -2606,6 +2820,25 @@
         closeModal('exportProgressModal');
     }
     
+    // 生成失败导出的CSV表格
+    function generateFailedExportCSV(failedExports) {
+        // CSV表头
+        let csv = '货号,文件名,错误信息\n';
+        
+        // 遍历失败的导出记录
+        failedExports.forEach(item => {
+            // 处理CSV中的特殊字符
+            const productCode = item.productCode ? item.productCode.replace(/"/g, '""') : '';
+            const filename = item.filename ? item.filename.replace(/"/g, '""') : '';
+            const error = item.error ? item.error.replace(/"/g, '""') : '';
+            
+            // 添加到CSV行
+            csv += `"${productCode}","${filename}","${error}"\n`;
+        });
+        
+        return csv;
+    }
+    
     // 更新选中信息
     function updateSelectionInfo() {
         const productCheckboxes = document.querySelectorAll('.product-checkbox');
@@ -2613,6 +2846,99 @@
         
         // 计算当前页面中选中的货号
         const selectedProductCodesArray = selectedCheckboxes.map(checkbox => checkbox.value);
+        
+        // 计算重复货号数量
+        const productCodeCounts = {};
+        selectedProductCodesArray.forEach(groupKey => {
+            // 提取货号（去除后缀和批次ID，与h3显示的货号保持一致）
+            let productCode = groupKey.split('_')[0];
+            
+            // 分割货号，找到第一个非数字部分作为原始货号
+            const parts = productCode.split('-');
+            let originalProductCode = '';
+            for (const part of parts) {
+                if (!/^[0-9]+$/.test(part) && part.length < 5) {
+                    originalProductCode = part;
+                    break;
+                }
+            }
+            
+            // 如果找到了原始货号，使用它
+            if (originalProductCode) {
+                productCode = originalProductCode;
+            } else {
+                // 如果没有非数字部分，使用第一部分
+                productCode = parts[0];
+            }
+            
+            productCodeCounts[productCode] = (productCodeCounts[productCode] || 0) + 1;
+        });
+        
+        // 计算重复货号数量（出现次数大于1的货号）并收集重复货号
+        let duplicateCount = 0;
+        const duplicateProductCodes = [];
+        for (const [productCode, count] of Object.entries(productCodeCounts)) {
+            if (count > 1) {
+                duplicateCount++;
+                duplicateProductCodes.push(productCode);
+            }
+        }
+        
+        // 计算异常图片数量并收集异常图片信息
+        let errorPhotosCount = 0;
+        const errorPhotos = [];
+        if (filteredPhotos.length > 0) {
+            filteredPhotos.forEach(photo => {
+                if (!photo) return;
+                // 检查照片是否在选中的分组中
+                const isSelected = selectedProductCodesArray.some(groupKey => {
+                    const groupProductCode = groupKey.split('_')[0];
+                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
+                });
+                if (isSelected) {
+                    // 检查图片是否存在（通过路径是否有效判断）
+                    // 这里简化处理，实际项目中可能需要更复杂的判断
+                    if (!photo.path || photo.path === '/uploads/') {
+                        errorPhotosCount++;
+                        errorPhotos.push(`${photo.productCode || '未分类'}-${photo.filename || '未知文件'}`);
+                    }
+                }
+            });
+        }
+        
+        // 计算带空格货号的数量并收集带空格货号
+        let spaceProductCodeCount = 0;
+        const spaceProductCodes = [];
+        selectedProductCodesArray.forEach(groupKey => {
+            // 提取货号（去除后缀和批次ID，与h3显示的货号保持一致）
+            let productCode = groupKey.split('_')[0];
+            
+            // 分割货号，找到第一个非数字部分作为原始货号
+            const parts = productCode.split('-');
+            let originalProductCode = '';
+            for (const part of parts) {
+                if (!/^[0-9]+$/.test(part) && part.length < 5) {
+                    originalProductCode = part;
+                    break;
+                }
+            }
+            
+            // 如果找到了原始货号，使用它
+            if (originalProductCode) {
+                productCode = originalProductCode;
+            } else {
+                // 如果没有非数字部分，使用第一部分
+                productCode = parts[0];
+            }
+            
+            // 检查货号是否包含空格
+            if (productCode.includes(' ')) {
+                if (!spaceProductCodes.includes(productCode)) {
+                    spaceProductCodeCount++;
+                    spaceProductCodes.push(productCode);
+                }
+            }
+        });
         
         // 更新对应页面的选择状态
         const currentView = document.getElementById('currentView').textContent;
@@ -2640,7 +2966,7 @@
                 // 检查照片的货号是否在选中的分组键中
                 return selectedProductCodesArray.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
-                    return groupProductCode === photo.productCode;
+                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
                 });
             });
             selectedPhotosCount = selectedPhotos.length;
@@ -2648,7 +2974,32 @@
         
         const selectionInfo = document.getElementById('selectionInfo');
         if (selectionInfo) {
-            selectionInfo.textContent = `已选择 ${selectedProductCodesArray.length} 个货号，共 ${selectedPhotosCount} 张图片`;
+            let message = `已选择 ${selectedProductCodesArray.length} 个货号，共 ${selectedPhotosCount} 张图片`;
+            let errorMessage = '';
+            let duplicateMessage = '';
+            let spaceMessage = '';
+            
+            if (duplicateCount > 0) {
+                duplicateMessage = `<span style="color: red; font-weight: bold;">（其中 ${duplicateCount} 个货号重复：${duplicateProductCodes.join(', ')}）</span>`;
+            }
+            
+            if (errorPhotosCount > 0) {
+                errorMessage = `<span style="color: orange; font-weight: bold;">（其中 ${errorPhotosCount} 张图片异常：${errorPhotos.slice(0, 5).join(', ')}${errorPhotos.length > 5 ? '...' : ''}）</span>`;
+            }
+            
+            if (spaceProductCodeCount > 0) {
+                spaceMessage = `<span style="color: purple; font-weight: bold;">（其中 ${spaceProductCodeCount} 个货号带空格：${spaceProductCodes.join(', ')}，可能导致导出缺失图片）</span>`;
+            }
+            
+            if (duplicateMessage) {
+                // 合并重复货号提示和导出图片可能会被覆盖的提示
+                const combinedMessage = duplicateMessage.replace('）', ',导出图片可能会被覆盖，请仔细检查！!!）');
+                selectionInfo.innerHTML = message + ' ' + combinedMessage + ' ' + errorMessage;
+            } else if (errorMessage) {
+                selectionInfo.innerHTML = message + ' ' + errorMessage;
+            } else {
+                selectionInfo.textContent = message;
+            }
         }
     }
     
@@ -2807,7 +3158,7 @@
                 // 检查照片的货号是否在选中的分组键中
                 const isSelected = selectedCodes.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
-                    return groupProductCode === photo.productCode;
+                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
                 });
                 if (isSelected) {
                     selectedPhotos.push(photo);
@@ -2847,7 +3198,7 @@
                 // 检查照片的货号是否在选中的分组键中
                 const isSelected = selectedProductCodes.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
-                    return groupProductCode === photo.productCode;
+                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
                 });
                 if (isSelected) {
                     photosToDelete.push(photo);
@@ -2899,6 +3250,340 @@
             alert('删除成功！');
         } else {
             alert('删除失败: 权限不足');
+        }
+    }
+    
+    // 导出单独文件图片
+    async function exportIndividualFiles() {
+        const selectedCheckboxes = document.querySelectorAll('.product-checkbox:checked');
+        if (selectedCheckboxes.length === 0) {
+            alert('请先选择要导出的货号');
+            return;
+        }
+        
+        // 收集选中的货号
+        const selectedProductCodes = Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
+        
+        // 收集所有选中货号的照片
+        const photosToExport = [];
+        filteredPhotos.forEach(photo => {
+            if (photo) {
+                // 检查照片的货号是否在选中的分组键中
+                const isSelected = selectedProductCodes.some(groupKey => {
+                    const groupProductCode = groupKey.split('_')[0];
+                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
+                });
+                if (isSelected) {
+                    photosToExport.push(photo);
+                }
+            }
+        });
+        
+        if (photosToExport.length === 0) {
+            alert('选中的货号没有照片');
+            return;
+        }
+        
+        // 显示选中的货号和图片数量
+        alert(`已选择 ${selectedProductCodes.length} 个货号，共 ${photosToExport.length} 张图片`);
+        
+        // 弹出命名模态框
+        document.getElementById('exportNameModal').classList.add('active');
+        // 保存选中的照片
+        window.selectedBatchPhotos = photosToExport;
+        window.exportType = 'individual'; // 标记为单独文件夹导出
+    }
+    
+    // 修改confirmExportName函数，支持按货号创建独立文件夹
+    async function confirmExportName() {
+        const exportName = document.getElementById('exportName').value.trim();
+        if (!exportName) {
+            alert('请输入压缩包名称');
+            return;
+        }
+        
+        // 检查是否需要同时导出 Excel
+        const exportExcel = document.getElementById('exportExcel').checked;
+        
+        // 关闭命名模态框
+        closeModal('exportNameModal');
+        
+        // 打开进度模态框
+        const exportProgressModal = document.getElementById('exportProgressModal');
+        const exportModalTitle = exportProgressModal.querySelector('.modal-title');
+        if (exportModalTitle) {
+            exportModalTitle.textContent = '导出图片';
+        }
+        exportProgressModal.classList.add('active');
+        
+        // 初始化导出变量
+        exportZip = new JSZip();
+        exportCanceled = false;
+        
+        // 确定要导出的照片：只导出勾选的照片
+        let photosToExport = window.selectedBatchPhotos || [];
+        const exportType = window.exportType || 'normal';
+        
+        // 如果没有批量选择的照片，检查是否有勾选的货号
+        if (photosToExport.length === 0) {
+            // 获取当前页面的状态
+            const currentView = document.getElementById('currentView').textContent;
+            let status = 'all';
+            if (currentView === '全部照片') {
+                status = 'all';
+            } else if (currentView === '已导出照片') {
+                status = 'exported';
+            } else if (currentView === '未导出照片') {
+                status = 'unexported';
+            }
+            
+            // 从 selectedProductCodes 中获取所有选中的货号
+            const selectedProductCodesSet = selectedProductCodes[status] || new Set();
+            const selectedCodes = Array.from(selectedProductCodesSet);
+            
+            if (selectedCodes.length === 0) {
+                closeModal('exportProgressModal');
+                alert('请先选择要导出的货号');
+                return;
+            }
+            
+            // 收集选中货号的照片
+            photosToExport = filteredPhotos.filter(photo => {
+                if (!photo) return false;
+                // 检查照片的货号是否在选中的分组键中
+                return selectedCodes.some(groupKey => {
+                    const groupProductCode = groupKey.split('_')[0];
+                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
+                });
+            });
+        }
+        
+        // 检查是否有符合条件的照片
+        if (photosToExport.length === 0) {
+            closeModal('exportProgressModal');
+            alert('没有符合条件的照片可导出');
+            return;
+        }
+        
+        // 清除批量选择的照片
+        window.selectedBatchPhotos = null;
+        window.exportType = null;
+        
+        // 统计每个纯货号的出现次数，用于检测重复（区分大小写）
+        const productCodeCount = {};
+        photosToExport.forEach(photo => {
+            let productCode = photo.productCode;
+            if (productCode) {
+                // 去除时间戳、随机码和批次ID，只保留纯货号
+                // 先处理下划线分隔的情况（如 123-1_1774004192518）
+                if (productCode.includes('_')) {
+                    const parts = productCode.split('_');
+                    if (parts.length > 1) {
+                        productCode = parts[0];
+                    }
+                }
+                
+                // 处理连字符分隔的情况，去除批次ID（如 123-1-1774004192518-abc123）
+                if (productCode.includes('-')) {
+                    // 找到最后一个连字符，去除后面的批次ID
+                    const lastHyphenIndex = productCode.lastIndexOf('-');
+                    if (lastHyphenIndex > 0) {
+                        const lastPart = productCode.substring(lastHyphenIndex + 1);
+                        // 检查最后一部分是否为批次ID（包含数字和字母）
+                        if (/^[0-9a-zA-Z]+$/.test(lastPart) && lastPart.length > 5) {
+                            productCode = productCode.substring(0, lastHyphenIndex);
+                        }
+                    }
+                }
+                
+                // 直接使用原始货号进行统计，区分大小写
+                productCodeCount[productCode] = (productCodeCount[productCode] || 0) + 1;
+            }
+        });
+        
+        try {
+            // 如果需要同时导出 Excel
+            if (exportExcel) {
+                // 先导出 Excel
+                await exportToExcel();
+            }
+            
+            // 更新进度条
+            updateExportProgress(0, '正在准备导出图片...');
+            
+            let successfullyExported = 0;
+            const failedExports = [];
+            
+            // 为每张照片创建下载链接并添加到压缩包
+            const downloadPromises = [];
+            
+            photosToExport.forEach((photo, i) => {
+                if (!photo || !photo.filename || !photo.path) {
+                    failedExports.push({
+                        filename: photo ? photo.filename : '未知文件名',
+                        productCode: photo ? photo.productCode : '未知货号',
+                        error: '无效的照片数据'
+                    });
+                    return;
+                }
+                
+                const promise = (async () => {
+                    try {
+                        const encodedPath = encodeURI(photo.path);
+                        const response = await fetch(encodedPath);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        const blob = await response.blob();
+                        
+                        // 处理文件名，确保去除时间戳和随机码
+                        let exportFilename = photo.filename;
+                        
+                        // 1. 先处理下划线分隔的情况（如 123-1_1774004192518.jpg）
+                        if (exportFilename.includes('_')) {
+                            const parts = exportFilename.split('_');
+                            if (parts.length > 1) {
+                                // 只保留下划线前的部分
+                                exportFilename = parts[0];
+                            }
+                        }
+                        // 2. 再处理连字符分隔的情况（如 123-1-1774004192518.jpg）
+                        else if (exportFilename.includes('-')) {
+                            const parts = exportFilename.split('-');
+                            if (parts.length > 2) {
+                                // 检查最后一部分是否为时间戳（纯数字）
+                                const lastPart = parts[parts.length - 1];
+                                if (/^\d+$/.test(lastPart)) {
+                                    // 只保留前两部分（货号+后缀）
+                                    exportFilename = parts.slice(0, 2).join('-');
+                                }
+                            }
+                        }
+                        
+                        // 3. 处理复杂货号格式，提取原始货号（如 Ac-1774006823873-202400-ha916j1ls）
+                        let pureProductCode = photo.productCode;
+                        if (pureProductCode) {
+                            // 分割货号
+                            const parts = pureProductCode.split('-');
+                            // 找到第一个非数字部分作为原始货号
+                            let originalProductCode = '';
+                            for (const part of parts) {
+                                if (!/^[0-9]+$/.test(part) && part.length < 5) {
+                                    originalProductCode = part;
+                                    break;
+                                }
+                            }
+                            // 如果找到了原始货号，使用它
+                            if (originalProductCode) {
+                                pureProductCode = originalProductCode;
+                            }
+                        }
+                        
+                        // 确保文件名有扩展名
+                        if (!exportFilename.includes('.')) {
+                            // 从path中提取扩展名
+                            const pathParts = photo.path.split('.');
+                            if (pathParts.length > 1) {
+                                const extension = pathParts.pop();
+                                // 确保是有效的图片扩展名
+                                const validImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                                if (validImageExtensions.includes(extension.toLowerCase())) {
+                                    exportFilename = `${exportFilename}.${extension}`;
+                                }
+                            }
+                        }
+                        
+                        // 根据导出类型决定如何添加到压缩包
+                        if (exportType === 'individual' && pureProductCode) {
+                            // 按原始货号创建独立文件夹，去除空格
+                            const folderName = pureProductCode.replace(/\s+/g, '');
+                            exportZip.folder(folderName).file(exportFilename, blob);
+                        } else {
+                            // 直接添加到根目录
+                            exportZip.file(exportFilename, blob);
+                        }
+                        
+                        successfullyExported++;
+                        
+                        // 更新进度条
+                        updateExportProgress((i / photosToExport.length) * 100, `正在导出图片: ${photo.filename}...`);
+                    } catch (error) {
+                        console.error(`处理照片 ${photo.filename} 失败:`, error);
+                        failedExports.push({
+                            filename: photo.filename,
+                            productCode: photo.productCode || '未知货号',
+                            error: error.message
+                        });
+                    }
+                })();
+                
+                downloadPromises.push(promise);
+            });
+            
+            // 等待所有照片下载完成
+            await Promise.all(downloadPromises);
+            
+            // 处理失败的导出
+            if (failedExports.length > 0) {
+                // 创建失败导出的简易表格
+                const failedExportCSV = generateFailedExportCSV(failedExports);
+                const failedBlob = new Blob([failedExportCSV], { type: 'text/csv;charset=utf-8;' });
+                
+                // 添加到压缩包
+                exportZip.file('导出失败列表.csv', failedBlob);
+            }
+            
+            updateExportProgress(90, '正在生成图片压缩包...');
+            
+            // 生成压缩包
+            const zipBlob = await exportZip.generateAsync({ type: 'blob' }, function(metadata) {
+                const progress = 90 + (metadata.percent / 10);
+                updateExportProgress(progress, `正在生成图片压缩包...`);
+            });
+            
+            updateExportProgress(100, '图片导出完成！');
+            
+            // 创建下载链接
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(zipBlob);
+            link.download = `${exportName}.zip`;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // 标记导出的照片为已导出并更新服务器
+            for (let i = 0; i < photosToExport.length; i++) {
+                const photo = photosToExport[i];
+                if (photo) {
+                    photo.exported = true;
+                    // 异步更新服务器上的导出状态
+                    fetch(`/api/photos/${photo.id}/exported`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ exported: true })
+                    }).catch(error => {
+                        console.error('更新导出状态失败:', error);
+                    });
+                }
+            }
+            
+            // 显示完成消息
+            setTimeout(() => {
+                closeModal('exportProgressModal');
+                let message = `成功导出 ${successfullyExported} 张图片到压缩包: ${exportName}.zip`;
+                if (failedExports.length > 0) {
+                    message += `\n有 ${failedExports.length} 张图片导出失败，已在压缩包中生成"导出失败列表.csv"`;
+                }
+                alert(message);
+            }, 1000);
+            
+        } catch (error) {
+            console.error('导出失败:', error);
+            closeModal('exportProgressModal');
+            alert('导出失败，请重试');
         }
     }
     
@@ -3164,6 +3849,298 @@
     function viewProductDetails(productCode) {
         alert(`查看货号 ${productCode} 的详细信息...`);
         // 这里可以实现查看货号详细信息的功能
+    }
+    
+    // 打开修改货号和后缀模态框
+    function openEditProductCodeModal(groupKey) {
+        // 创建模态框
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">修改货号和后缀</h3>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="editProductCode">货号：</label>
+                        <input type="text" id="editProductCode" placeholder="请输入货号" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editProductSuffix">后缀：</label>
+                        <select id="editProductSuffix" class="filter-select">
+                            <option value="">无后缀</option>
+                            <option value="-1">-1 (递增格式：-1, -2, -3)</option>
+                            <option value="(1)">(1) (递增格式：(1), (2), (3))</option>
+                        </select>
+                    </div>
+                    <input type="hidden" id="editGroupKey" value="${groupKey}">
+                </div>
+                <div class="modal-footer">
+                    <button class="action-btn secondary" onclick="closeEditProductCodeModal()">取消</button>
+                    <button class="action-btn primary" onclick="(async function() { await saveProductCodeChanges(); })()">保存</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // 提取当前货号和后缀
+        let productCode = groupKey.split('_')[0];
+        let suffix = '';
+        
+        // 去除随机码部分，只保留纯货号
+        // 查找最后两个连字符的位置，去除时间戳和随机数
+        const hyphens = productCode.match(/-/g);
+        if (hyphens && hyphens.length >= 2) {
+            // 找到倒数第二个连字符的位置
+            let lastHyphenIndex = productCode.lastIndexOf('-');
+            let secondLastHyphenIndex = productCode.lastIndexOf('-', lastHyphenIndex - 1);
+            if (secondLastHyphenIndex > 0) {
+                // 提取货号和后缀部分
+                productCode = productCode.substring(0, secondLastHyphenIndex);
+            }
+        }
+        
+        // 处理带括号的后缀，如 159(1)
+        const bracketMatch = productCode.match(/^(.*?)\(\d+\)$/);
+        if (bracketMatch) {
+            productCode = bracketMatch[1];
+            suffix = '(1)';
+        }
+        // 处理带连字符的后缀，如 159-1
+        else if (productCode.includes('-') && productCode.split('-').length > 1) {
+            const parts = productCode.split('-');
+            if (parts.length === 2 && /^\d+$/.test(parts[1])) {
+                suffix = '-' + parts[1];
+                productCode = parts[0];
+            }
+        }
+        
+        // 设置输入框值
+        document.getElementById('editProductCode').value = productCode;
+        document.getElementById('editProductSuffix').value = suffix;
+    }
+    
+    // 关闭修改货号和后缀模态框
+    function closeEditProductCodeModal() {
+        const modal = document.querySelector('.modal.active');
+        if (modal) {
+            modal.remove();
+        }
+    }
+    
+    // 保存货号和后缀修改
+    async function saveProductCodeChanges() {
+        const groupKey = document.getElementById('editGroupKey').value;
+        const newProductCode = document.getElementById('editProductCode').value.trim();
+        const suffix = document.getElementById('editProductSuffix').value;
+        
+        if (!newProductCode) {
+            alert('请输入货号');
+            return;
+        }
+        
+        // 构建完整的货号，包括后缀
+        let fullProductCode;
+        if (suffix === '(1)') {
+            // 对于括号类型的后缀，直接拼接
+            fullProductCode = newProductCode + suffix;
+        } else {
+            // 对于其他类型的后缀，使用连字符连接
+            fullProductCode = newProductCode + suffix;
+        }
+        
+        // 收集需要更新的照片
+        const photosToUpdate = [];
+        
+        // 只获取当前批次的照片，用于递增编号
+        const productPhotos = allPhotos.filter(photo => {
+            return photo && photo.productCode === groupKey;
+        });
+        
+        // 更新本地照片数据中的货号和文件名
+        allPhotos.forEach(photo => {
+            if (photo && photo.productCode && photo.filename) {
+                // 只更新当前批次的照片
+                if (photo.productCode === groupKey) {
+                    // 保留原始货号中的批次ID
+                    const hyphens = photo.productCode.match(/-/g);
+                    let newProductCodeValue;
+                    if (hyphens && hyphens.length >= 2) {
+                        // 找到最后两个连字符的位置，提取批次ID
+                        let lastHyphenIndex = photo.productCode.lastIndexOf('-');
+                        let secondLastHyphenIndex = photo.productCode.lastIndexOf('-', lastHyphenIndex - 1);
+                        if (secondLastHyphenIndex > 0) {
+                            // 提取批次ID部分
+                            const batchIdPart = photo.productCode.substring(secondLastHyphenIndex);
+                            // 组合新货号和原始批次ID
+                            newProductCodeValue = fullProductCode + batchIdPart;
+                        } else {
+                            newProductCodeValue = fullProductCode;
+                        }
+                    } else {
+                        newProductCodeValue = fullProductCode;
+                    }
+                    
+                    // 计算照片的序号（从1开始）
+                    const photoIndex = productPhotos.indexOf(photo) + 1;
+                    
+                    // 从path中提取原始文件的扩展名，因为path包含完整的文件路径
+                    let originalExtension = '';
+                    const pathParts = photo.path.split('.');
+                    if (pathParts.length > 1) {
+                        originalExtension = pathParts.pop();
+                    }
+                    // 确保扩展名是有效的图片格式
+                    const validImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                    const hasExtension = originalExtension && validImageExtensions.includes(originalExtension.toLowerCase());
+                    
+                    // 根据后缀格式生成新的文件名
+                    let newFilename;
+                    if (suffix === '-1') {
+                        // 后缀为-1，使用-1, -2, -3格式
+                        newFilename = `${newProductCode}-${photoIndex}${hasExtension ? `.${originalExtension}` : ''}`;
+                    } else if (suffix === '(1)') {
+                        // 后缀为(1)，使用(1), (2), (3)格式
+                        newFilename = `${newProductCode}(${photoIndex})${hasExtension ? `.${originalExtension}` : ''}`;
+                    } else {
+                        // 其他后缀格式，使用后缀+序号
+                        newFilename = `${fullProductCode}-${photoIndex}${hasExtension ? `.${originalExtension}` : ''}`;
+                    }
+                    
+                    // 收集需要更新的照片
+                        photosToUpdate.push({
+                            id: photo.id,
+                            productCode: newProductCodeValue,
+                            filename: newFilename
+                        });
+                        
+                        // 更新本地数据
+                        photo.productCode = newProductCodeValue;
+                        photo.filename = newFilename;
+                        // 保留原始path，确保图片能正常显示
+                        // 只更新数据库中的文件名和货号信息，不实际重命名文件
+                }
+            }
+        });
+        
+        // 同时更新filteredPhotos
+        filteredPhotos.forEach(photo => {
+            if (photo && photo.productCode && photo.filename) {
+                // 只更新当前批次的照片
+                if (photo.productCode === groupKey) {
+                    // 保留原始货号中的批次ID
+                    const hyphens = photo.productCode.match(/-/g);
+                    let newProductCodeValue;
+                    if (hyphens && hyphens.length >= 2) {
+                        // 找到最后两个连字符的位置，提取批次ID
+                        let lastHyphenIndex = photo.productCode.lastIndexOf('-');
+                        let secondLastHyphenIndex = photo.productCode.lastIndexOf('-', lastHyphenIndex - 1);
+                        if (secondLastHyphenIndex > 0) {
+                            // 提取批次ID部分
+                            const batchIdPart = photo.productCode.substring(secondLastHyphenIndex);
+                            // 组合新货号和原始批次ID
+                            newProductCodeValue = fullProductCode + batchIdPart;
+                        } else {
+                            newProductCodeValue = fullProductCode;
+                        }
+                    } else {
+                        newProductCodeValue = fullProductCode;
+                    }
+                    
+                    // 计算照片的序号（从1开始）
+                    const photoIndex = productPhotos.indexOf(photo) + 1;
+                    
+                    // 从path中提取原始文件的扩展名，因为path包含完整的文件路径
+                    let originalExtension = '';
+                    const pathParts = photo.path.split('.');
+                    if (pathParts.length > 1) {
+                        originalExtension = pathParts.pop();
+                    }
+                    // 确保扩展名是有效的图片格式
+                    const validImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                    const hasExtension = originalExtension && validImageExtensions.includes(originalExtension.toLowerCase());
+                    
+                    // 根据后缀格式生成新的文件名
+                    let newFilename;
+                    if (suffix === '-1') {
+                        // 后缀为-1，使用-1, -2, -3格式
+                        newFilename = `${newProductCode}-${photoIndex}${hasExtension ? `.${originalExtension}` : ''}`;
+                    } else if (suffix === '(1)') {
+                        // 后缀为(1)，使用(1), (2), (3)格式
+                        newFilename = `${newProductCode}(${photoIndex})${hasExtension ? `.${originalExtension}` : ''}`;
+                    } else {
+                        // 其他后缀格式，使用后缀+序号
+                        newFilename = `${fullProductCode}-${photoIndex}${hasExtension ? `.${originalExtension}` : ''}`;
+                    }
+                    
+                    // 更新本地数据
+                    photo.productCode = newProductCodeValue;
+                    photo.filename = newFilename;
+                    // 保留原始path，确保图片能正常显示
+                    // 只更新数据库中的文件名和货号信息，不实际重命名文件
+                }
+            }
+        });
+        
+        // 保存到服务器
+        try {
+            // 批量更新照片信息
+            for (const photo of photosToUpdate) {
+                const response = await fetch(`/api/photos/${photo.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        productCode: photo.productCode,
+                        filename: photo.filename
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`更新照片${photo.id}失败: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                console.log('更新照片成功:', result);
+            }
+            
+            alert(`已修改货号为：${newProductCode}\n后缀修改为由${fullProductCode}开始显示`);
+        } catch (error) {
+            console.error('保存货号修改失败:', error);
+            alert('保存失败，请重试');
+        }
+        
+        // 关闭模态框
+        closeEditProductCodeModal();
+        
+        // 不重新加载数据，避免刷新置顶
+        // 直接更新本地数据
+        const currentView = document.getElementById('currentView').textContent;
+        let status = 'all';
+        if (currentView === '全部照片') {
+            status = 'all';
+        } else if (currentView === '已导出照片') {
+            status = 'exported';
+        } else if (currentView === '未导出照片') {
+            status = 'unexported';
+        }
+        
+        // 更新selectedProductCodes中的分组键，确保修改货号后仍然能正确导出
+        for (const statusKey in selectedProductCodes) {
+            if (selectedProductCodes[statusKey].has(groupKey)) {
+                // 移除旧的分组键
+                selectedProductCodes[statusKey].delete(groupKey);
+                // 添加新的分组键（使用第一个照片的新productCode作为分组键）
+                if (photosToUpdate.length > 0) {
+                    selectedProductCodes[statusKey].add(photosToUpdate[0].productCode);
+                }
+            }
+        }
+        
+        // 只更新当前视图的显示，不重新加载数据
+        displayPhotos(status);
     }
     
     // 导出所有照片

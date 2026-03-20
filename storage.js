@@ -1,6 +1,21 @@
 const fs = require('fs');
 const path = require('path');
 
+// 导入服务器模块以使用broadcast函数
+let broadcast;
+try {
+    const serverModule = require('./server');
+    broadcast = serverModule.broadcast;
+} catch (error) {
+    // 服务器模块尚未初始化，稍后会设置
+    broadcast = null;
+}
+
+// 允许外部设置broadcast函数
+function setBroadcast(broadcastFn) {
+    broadcast = broadcastFn;
+}
+
 // 存储配置
 const storageConfig = {
     uploadDir: path.join(__dirname, 'uploads'),
@@ -59,6 +74,16 @@ function addPhoto(photo) {
     };
     photos.push(newPhoto);
     writePhotos(photos);
+    
+    // 广播照片上传消息
+    if (broadcast) {
+        try {
+            broadcast({ type: 'photo_uploaded', photo: newPhoto });
+        } catch (error) {
+            console.error('广播照片上传消息失败:', error);
+        }
+    }
+    
     return newPhoto;
 }
 
@@ -104,6 +129,40 @@ function updatePhotoExportStatus(id, exported) {
     return writePhotos(photos);
 }
 
+// 获取未导出的照片数量
+function getUnexportedPhotosCount() {
+    const photos = readPhotos();
+    return photos.filter(photo => photo.exported !== true).length;
+}
+
+// 更新照片信息
+function updatePhoto(id, updates) {
+    try {
+        console.log('开始更新照片:', id, updates);
+        const photos = readPhotos();
+        console.log('读取到照片数量:', photos.length);
+        
+        const photoIndex = photos.findIndex(p => p.id === id);
+        console.log('找到照片索引:', photoIndex);
+        
+        if (photoIndex === -1) {
+            console.log('照片不存在:', id);
+            return false;
+        }
+        
+        console.log('更新前的照片信息:', photos[photoIndex]);
+        photos[photoIndex] = { ...photos[photoIndex], ...updates };
+        console.log('更新后的照片信息:', photos[photoIndex]);
+        
+        const result = writePhotos(photos);
+        console.log('写入结果:', result);
+        return result;
+    } catch (error) {
+        console.error('更新照片失败:', error);
+        return false;
+    }
+}
+
 module.exports = {
     storageConfig,
     ensureDirectories,
@@ -111,5 +170,8 @@ module.exports = {
     deletePhoto,
     getAllPhotos,
     getPhotoById,
-    updatePhotoExportStatus
+    updatePhotoExportStatus,
+    updatePhoto,
+    getUnexportedPhotosCount,
+    setBroadcast
 };

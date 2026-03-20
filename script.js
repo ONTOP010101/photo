@@ -117,7 +117,7 @@ async function uploadPhoto() {
     
     try {
         // 生成文件名
-        const filename = `${productCode}${suffix.replace(/\d+$/, '')}${currentNumber}.jpg`;
+                        const filename = suffix ? `${productCode}${suffix.replace(/\d+$/, '')}${currentNumber}.jpg` : `${productCode}.jpg`;
         
         // 将base64转换为Blob
         const response = await fetch(capturedImage);

@@ -3,6 +3,7 @@ const multer = require('multer');
 const cors = require('cors');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const WebSocket = require('ws');
 const storageManager = require('./storage');
 const authManager = require('./auth');
 
@@ -158,6 +159,17 @@ app.get('/api/photos', (req, res) => {
     res.json(photos);
 });
 
+// 获取未导出的照片数量
+app.get('/api/photos/unexported', (req, res) => {
+    try {
+        const count = storageManager.getUnexportedPhotosCount();
+        res.json({ count });
+    } catch (error) {
+        console.error('获取未导出照片数量失败:', error);
+        res.status(500).json({ error: '获取未导出照片数量失败' });
+    }
+});
+
 // 获取单个照片
 app.get('/api/photos/:id', (req, res) => {
     const { id } = req.params;
@@ -192,27 +204,40 @@ app.delete('/api/photos/:id', (req, res) => {
     }
     
     // 检查权限：
-    // 1. 对于非共享照片，只有拍摄者才能删除
-    // 2. 对于共享照片，只有共享房间的创建者才能删除，拍摄者不能删除
+    // 1. 管理员可以删除任何照片
+    // 2. 对于非共享照片，只有拍摄者才能删除
+    // 3. 对于共享照片，只有共享房间的创建者才能删除，拍摄者不能删除
     console.log('检查权限开始');
     console.log('照片信息:', photo);
     console.log('请求删除的用户名:', username);
     
-    if (!photo.shareCode) {
-        // 非共享照片，只有拍摄者才能删除
-        console.log('非共享照片，检查拍摄者:', photo.username, 'vs', username);
-        if (photo.username !== username) {
-            console.log('权限不足，只能删除自己的非共享照片');
-            return res.status(403).json({ error: '权限不足，只能删除自己的非共享照片' });
+    // 获取用户角色
+    const users = authManager.getAllUsers();
+    const currentUser = users.find(user => user.username === username);
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    console.log('用户角色:', currentUser ? currentUser.role : '未知');
+    console.log('是否为管理员:', isAdmin);
+    
+    // 管理员可以删除任何照片
+    if (!isAdmin) {
+        if (!photo.shareCode) {
+            // 非共享照片，只有拍摄者才能删除
+            console.log('非共享照片，检查拍摄者:', photo.username, 'vs', username);
+            if (photo.username !== username) {
+                console.log('权限不足，只能删除自己的非共享照片');
+                return res.status(403).json({ error: '权限不足，只能删除自己的非共享照片' });
+            }
+        } else {
+            // 共享照片，只有共享房间的创建者才能删除
+            const owner = authManager.getShareOwner(photo.shareCode);
+            console.log('共享照片，共享房间所有者:', owner, 'vs', username);
+            if (owner !== username) {
+                console.log('权限不足，只有共享房间的创建者才能删除共享照片');
+                return res.status(403).json({ error: '权限不足，只有共享房间的创建者才能删除共享照片' });
+            }
         }
     } else {
-        // 共享照片，只有共享房间的创建者才能删除
-        const owner = authManager.getShareOwner(photo.shareCode);
-        console.log('共享照片，共享房间所有者:', owner, 'vs', username);
-        if (owner !== username) {
-            console.log('权限不足，只有共享房间的创建者才能删除共享照片');
-            return res.status(403).json({ error: '权限不足，只有共享房间的创建者才能删除共享照片' });
-        }
+        console.log('管理员权限，跳过权限检查');
     }
     console.log('权限检查通过');
     
@@ -547,6 +572,30 @@ app.put('/api/photos/:id/exported', (req, res) => {
     }
 });
 
+// 更新照片信息
+app.put('/api/photos/:id', (req, res) => {
+    try {
+        console.log('接收到更新照片请求:', req.params.id, req.body);
+        const { id } = req.params;
+        const updates = req.body;
+        
+        const photoId = parseInt(id);
+        console.log('解析后的照片ID:', photoId);
+        
+        const success = storageManager.updatePhoto(photoId, updates);
+        console.log('更新结果:', success);
+        
+        if (!success) {
+            return res.status(404).json({ error: '照片不存在' });
+        }
+        
+        res.json({ message: '照片信息更新成功' });
+    } catch (error) {
+        console.error('更新照片信息失败:', error);
+        res.status(500).json({ error: '更新照片信息失败', details: error.message });
+    }
+});
+
 // 静态文件服务
 app.use(express.static('.'));
 app.use('/uploads', express.static(storageManager.storageConfig.uploadDir));
@@ -569,9 +618,56 @@ try {
         console.error('服务器启动错误:', error);
     });
     
+    // 创建WebSocket服务器
+    const wss = new WebSocket.Server({ server });
+    
+    // 存储所有连接的客户端
+    const clients = new Set();
+    
+    wss.on('connection', (ws) => {
+        console.log('新的WebSocket连接');
+        clients.add(ws);
+        
+        ws.on('message', (message) => {
+            console.log('收到消息:', message);
+        });
+        
+        ws.on('close', () => {
+            console.log('WebSocket连接关闭');
+            clients.delete(ws);
+        });
+        
+        ws.on('error', (error) => {
+            console.error('WebSocket错误:', error);
+            clients.delete(ws);
+        });
+    });
+    
+    // 广播消息给所有客户端
+    function broadcast(message) {
+        clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify(message));
+            }
+        });
+    }
+    
+    // 导出broadcast函数，供其他模块使用
+    module.exports.broadcast = broadcast;
+    
+    // 设置storage模块的broadcast函数
+    try {
+        const storage = require('./storage');
+        storage.setBroadcast(broadcast);
+        console.log('已设置storage模块的broadcast函数');
+    } catch (error) {
+        console.error('设置storage模块的broadcast函数失败:', error);
+    }
+    
     // 保持服务器运行
     process.on('SIGINT', () => {
         console.log('正在关闭服务器...');
+        wss.close();
         server.close(() => {
             console.log('服务器已关闭');
             process.exit(0);
