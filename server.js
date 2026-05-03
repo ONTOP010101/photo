@@ -614,7 +614,21 @@ app.use('/uploads', express.static(storageManager.storageConfig.uploadDir, {
 
 try {
     const server = app.listen(PORT, '0.0.0.0', () => {
+        const os = require('os');
+        const interfaces = os.networkInterfaces();
+        let localIP = 'localhost';
+        for (const name of Object.keys(interfaces)) {
+            for (const iface of interfaces[name]) {
+                if (iface.family === 'IPv4' && !iface.internal) {
+                    localIP = iface.address;
+                    break;
+                }
+            }
+        }
         console.log(`服务器运行在 http://localhost:${PORT}`);
+        console.log(`网络访问地址: http://${localIP}:${PORT}`);
+        console.log(`前端登录页面: http://${localIP}:${PORT}`);
+        console.log(`管理后台: http://${localIP}:${PORT}/admin.html`);
     });
 
     server.timeout = 120000;
