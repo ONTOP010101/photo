@@ -2,10 +2,12 @@ const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const WebSocket = require('ws');
 const storageManager = require('./storage');
 const authManager = require('./auth');
+const archiver = require('archiver');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,7 +18,7 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // 确保目录存在
 storageManager.ensureDirectories();
@@ -43,9 +45,36 @@ const upload = multer({
     }
 });
 
+const chatStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const chatUploadDir = path.join(__dirname, 'uploads', 'chat');
+        if (!fs.existsSync(chatUploadDir)) {
+            fs.mkdirSync(chatUploadDir, { recursive: true });
+        }
+        cb(null, chatUploadDir);
+    },
+    filename: function (req, file, cb) {
+        const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 6)}_${originalName}`;
+        cb(null, uniqueName);
+    }
+});
+
+const chatUpload = multer({
+    storage: chatStorage,
+    limits: {
+        fileSize: 2 * 1024 * 1024 * 1024 // 2GB per file
+    }
+});
+
 // 根路径重定向到admin.html
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+// 聊天页面独立路由
+app.get('/chat', (req, res) => {
+    res.sendFile(path.join(__dirname, 'chat.html'));
 });
 
 // API路由
@@ -162,7 +191,6 @@ app.get('/api/photos/unexported', (req, res) => {
         // 直接从req.query获取username
         const username = req.query.username;
         // 写入日志到文件
-        const fs = require('fs');
         const logMessage = `[${new Date().toISOString()}] Received unexported count request: username=${username}, query=${JSON.stringify(req.query)}\n`;
         fs.appendFileSync('server.log', logMessage);
         const photoCount = storageManager.getUnexportedPhotosCount(username);
@@ -527,9 +555,225 @@ app.delete('/api/auth/delete-share', (req, res) => {
     }
 });
 
+// 服务端创建ZIP导出（流式→temp文件，返回下载token）
+app.post('/api/export/zip', (req, res) => {
+    try {
+        const { paths, filenames, exportName } = req.body;
+        if (!paths || !Array.isArray(paths) || paths.length === 0) {
+            return res.status(400).json({ error: '请提供要导出的文件路径' });
+        }
+
+        const token = Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 6);
+        const zipName = (exportName || 'export') + '.zip';
+        const tempDir = path.join(__dirname, 'uploads', 'temp');
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        const tempPath = path.join(tempDir, token + '.zip');
+
+        const output = fs.createWriteStream(tempPath);
+        const archive = archiver('zip', { zlib: { level: 1 } });
+
+        archive.on('error', (err) => {
+            console.error('ZIP创建错误:', err);
+            output.end();
+            fs.unlink(tempPath, () => {});
+        });
+
+        archive.pipe(output);
+
+        let addedCount = 0;
+        for (let i = 0; i < paths.length; i++) {
+            const filePath = path.join(__dirname, paths[i]);
+            if (fs.existsSync(filePath)) {
+                const nameInZip = (filenames && filenames[i]) || paths[i].split('/').pop();
+                archive.file(filePath, { name: nameInZip });
+                addedCount++;
+            }
+        }
+
+        if (addedCount === 0) {
+            archive.abort();
+            return res.status(404).json({ error: '没有找到任何可导出的文件' });
+        }
+
+        output.on('close', () => {
+            res.json({
+                token: token,
+                filename: zipName,
+                count: addedCount
+            });
+        });
+
+        archive.finalize();
+    } catch (error) {
+        console.error('导出ZIP失败:', error);
+        res.status(500).json({ error: '导出ZIP失败' });
+    }
+});
+
+// 下载已生成的ZIP文件
+app.get('/api/export/download/:token', (req, res) => {
+    const token = req.params.token.replace(/\.zip$/i, '');
+    const tempPath = path.join(__dirname, 'uploads', 'temp', token + '.zip');
+
+    if (!fs.existsSync(tempPath)) {
+        return res.status(404).json({ error: '文件不存在或已过期' });
+    }
+
+    const filename = req.query.name || 'export.zip';
+    res.download(tempPath, filename, (err) => {
+        if (!err) {
+            setTimeout(() => {
+                fs.unlink(tempPath, () => {});
+            }, 5000);
+        }
+    });
+});
+
 // 健康检查
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
+});
+
+// 聊天文件下载路由
+app.get('/api/chat/download/:filename', (req, res) => {
+    const diskFilename = req.params.filename;
+    const downloadName = req.query.name || diskFilename;
+    const filePath = path.join(__dirname, 'uploads', 'chat', diskFilename);
+
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: '文件不存在' });
+    }
+
+    res.download(filePath, downloadName);
+});
+
+// 聊天文件上传目录
+app.use('/uploads/chat', express.static(path.join(__dirname, 'uploads', 'chat'), {
+    maxAge: '1h',
+    setHeaders: (res, path) => {
+        res.setHeader('Connection', 'keep-alive');
+    }
+}));
+
+// 好友API
+app.get('/api/chat/friends/:username', (req, res) => {
+    try {
+        const { username } = req.params;
+        const friends = storageManager.getFriends(username);
+        const users = authManager.getAllUsers();
+        const friendUsers = friends.map(f => {
+            const friendUsername = f.username === username ? f.friendUsername : f.username;
+            const friendUser = users.find(u => u.username === friendUsername);
+            return {
+                relationshipId: f.id,
+                username: friendUsername,
+                name: friendUser ? friendUser.name : friendUsername,
+                createdAt: f.createdAt
+            };
+        });
+        res.json(friendUsers);
+    } catch (error) {
+        console.error('获取好友列表失败:', error);
+        res.status(500).json({ error: '获取好友列表失败' });
+    }
+});
+
+app.post('/api/chat/friends', (req, res) => {
+    try {
+        const { username, friendUsername } = req.body;
+        if (!username || !friendUsername) {
+            return res.status(400).json({ error: '请提供用户名和好友用户名' });
+        }
+        if (username === friendUsername) {
+            return res.status(400).json({ error: '不能添加自己为好友' });
+        }
+        const users = authManager.getAllUsers();
+        if (!users.find(u => u.username === friendUsername)) {
+            return res.status(400).json({ error: '好友用户不存在' });
+        }
+        const result = storageManager.addFriend(username, friendUsername);
+        if (!result.success) {
+            return res.status(400).json({ error: result.message });
+        }
+        res.status(201).json({ message: '好友添加成功', friend: result.friend });
+    } catch (error) {
+        console.error('添加好友失败:', error);
+        res.status(500).json({ error: '添加好友失败' });
+    }
+});
+
+app.delete('/api/chat/friends', (req, res) => {
+    try {
+        const { username, friendUsername } = req.body;
+        if (!username || !friendUsername) {
+            return res.status(400).json({ error: '请提供用户名和好友用户名' });
+        }
+        const result = storageManager.removeFriend(username, friendUsername);
+        if (!result.success) {
+            return res.status(400).json({ error: result.message });
+        }
+        res.json({ message: '好友删除成功' });
+    } catch (error) {
+        console.error('删除好友失败:', error);
+        res.status(500).json({ error: '删除好友失败' });
+    }
+});
+
+// 聊天消息API
+app.get('/api/chat/messages/:username1/:username2', (req, res) => {
+    try {
+        const { username1, username2 } = req.params;
+        const limit = parseInt(req.query.limit) || 100;
+        const messages = storageManager.getChatMessages(username1, username2, limit);
+        res.json(messages);
+    } catch (error) {
+        console.error('获取聊天消息失败:', error);
+        res.status(500).json({ error: '获取聊天消息失败' });
+    }
+});
+
+// 聊天文件上传
+app.post('/api/chat/upload', chatUpload.single('file'), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: '没有上传文件' });
+        }
+        const { from, to } = req.body;
+        const fileUrl = `/uploads/chat/${req.file.filename}`;
+        const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+        res.json({
+            filename: originalName,
+            path: fileUrl,
+            size: req.file.size,
+            mimetype: req.file.mimetype
+        });
+    } catch (error) {
+        console.error('上传聊天文件失败:', error);
+        res.status(500).json({ error: '上传聊天文件失败' });
+    }
+});
+
+// HTTP后备发送消息（当WebSocket不可用时）
+app.post('/api/chat/messages/send', (req, res) => {
+    try {
+        const { from, to, messageType, content, fileName, fileSize, filePath, fileType } = req.body;
+        if (!from || !to) {
+            return res.status(400).json({ error: '缺少必要参数' });
+        }
+        const msg = storageManager.addChatMessage({
+            from, to,
+            type: messageType || 'text',
+            content: content || '',
+            fileName: fileName || null,
+            fileSize: fileSize || null,
+            filePath: filePath || null,
+            fileType: fileType || null
+        });
+        res.json({ message: msg });
+    } catch (error) {
+        console.error('发送消息失败:', error);
+        res.status(500).json({ error: '发送消息失败' });
+    }
 });
 
 // 获取所有共享房间（包括已解散的）
@@ -577,6 +821,31 @@ app.put('/api/photos/:id/exported', async (req, res) => {
     } catch (error) {
         console.error('更新导出状态失败:', error);
         res.status(500).json({ error: '更新导出状态失败' });
+    }
+});
+
+// 批量更新照片导出状态
+app.put('/api/photos/batch/exported', async (req, res) => {
+    try {
+        const { ids, exported } = req.body;
+        
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: '请提供照片ID数组' });
+        }
+        if (exported === undefined) {
+            return res.status(400).json({ error: '请提供导出状态' });
+        }
+        
+        const success = await storageManager.batchUpdatePhotoExportStatus(ids.map(id => parseInt(id)), exported);
+        
+        if (!success) {
+            return res.status(500).json({ error: '批量更新导出状态失败' });
+        }
+        
+        res.json({ message: '批量导出状态更新成功', count: ids.length });
+    } catch (error) {
+        console.error('批量更新导出状态失败:', error);
+        res.status(500).json({ error: '批量更新导出状态失败' });
     }
 });
 
@@ -631,9 +900,9 @@ try {
         console.log(`管理后台: http://${localIP}:${PORT}/admin.html`);
     });
 
-    server.timeout = 120000;
-    server.keepAliveTimeout = 65000;
-    server.headersTimeout = 66000;
+    server.timeout = 600000;
+    server.keepAliveTimeout = 600000;
+    server.headersTimeout = 610000;
     server.maxHeadersCount = 0;
 
     server.on('error', (error) => {
@@ -643,31 +912,84 @@ try {
     // 创建WebSocket服务器
     const wss = new WebSocket.Server({ server });
     
-    // 存储所有连接的客户端
-    const clients = new Set();
+    // 存储所有连接的客户端 - 改用Map存储用户名和ws的关系
+    const clients = new Map();
+    const allClients = new Set();
     
     wss.on('connection', (ws) => {
         console.log('新的WebSocket连接');
-        clients.add(ws);
+        allClients.add(ws);
         
         ws.on('message', (message) => {
-            console.log('收到消息:', message);
+            try {
+                const data = JSON.parse(message);
+                console.log('收到消息:', data.type);
+                
+                if (data.type === 'register') {
+                    clients.set(data.username, ws);
+                    ws._username = data.username;
+                    console.log(`用户 ${data.username} 已注册`);
+                } else if (data.type === 'chat_message') {
+                    const msg = storageManager.addChatMessage({
+                        from: data.from,
+                        to: data.to,
+                        type: data.messageType || 'text',
+                        content: data.content,
+                        fileName: data.fileName || null,
+                        fileSize: data.fileSize || null,
+                        filePath: data.filePath || null,
+                        fileType: data.fileType || null
+                    });
+                    
+                    // 发送给接收方
+                    const targetWs = clients.get(data.to);
+                    if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+                        targetWs.send(JSON.stringify({
+                            type: 'chat_message',
+                            message: msg
+                        }));
+                    }
+                    
+                    // 也发给发送方确认
+                    ws.send(JSON.stringify({
+                        type: 'chat_message',
+                        message: msg
+                    }));
+                } else if (data.type === 'typing') {
+                    const targetWs = clients.get(data.to);
+                    if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+                        targetWs.send(JSON.stringify({
+                            type: 'typing',
+                            from: data.from,
+                            isTyping: data.isTyping
+                        }));
+                    }
+                }
+            } catch (error) {
+                console.error('处理WebSocket消息失败:', error);
+            }
         });
         
         ws.on('close', () => {
             console.log('WebSocket连接关闭');
-            clients.delete(ws);
+            allClients.delete(ws);
+            if (ws._username) {
+                clients.delete(ws._username);
+            }
         });
         
         ws.on('error', (error) => {
             console.error('WebSocket错误:', error);
-            clients.delete(ws);
+            allClients.delete(ws);
+            if (ws._username) {
+                clients.delete(ws._username);
+            }
         });
     });
     
     // 广播消息给所有客户端
     function broadcast(message) {
-        clients.forEach((client) => {
+        allClients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify(message));
             }

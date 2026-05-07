@@ -15,20 +15,94 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         html, body {
             overflow-x: hidden;
             width: 100%;
         }
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f5f7fa;
             color: #333;
             line-height: 1.6;
         }
-        
-        /* 顶部导航栏 */
+
+        /* 骨架屏动画 */
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 1000px 100%;
+            animation: shimmer 2s infinite linear;
+            border-radius: 4px;
+        }
+
+        .skeleton-group {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .skeleton-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .skeleton-checkbox {
+            width: 18px;
+            height: 18px;
+            border-radius: 3px;
+        }
+
+        .skeleton-title {
+            width: 200px;
+            height: 20px;
+        }
+
+        .skeleton-count {
+            width: 40px;
+            height: 20px;
+            margin-left: auto;
+        }
+
+        .skeleton-grid {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 15px;
+        }
+
+        .skeleton-item {
+            height: 160px;
+            border-radius: 8px;
+        }
+
+        /* 渐进式加载动画 */
+        .fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .product-group {
+            opacity: 0;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+
         .top-nav {
             background: linear-gradient(135deg, #3498db, #2980b9);
             color: white;
@@ -321,13 +395,19 @@
             position: relative;
             height: 160px;
             overflow: hidden;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
         }
-        
+
         .photo-container img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transition: transform 0.3s ease;
+            opacity: 0;
+            transition: opacity 0.4s ease, transform 0.3s ease;
+        }
+
+        .photo-container img.loaded {
+            opacity: 1;
         }
         
         .photo-item:hover .photo-container img {
@@ -761,6 +841,440 @@
                 font-size: 16px;
             }
         }
+        
+        /* 聊天界面样式 */
+        .chat-container {
+            display: flex;
+            height: calc(100vh - 200px);
+            min-height: 500px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+        
+        .chat-sidebar {
+            width: 300px;
+            min-width: 300px;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            background: #f8f9fa;
+        }
+        
+        .chat-sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+        }
+        
+        .chat-sidebar-header h3 {
+            font-size: 16px;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .friend-search-box {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+            background: white;
+        }
+        
+        .friend-search-box input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .friend-search-box input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .friend-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 0;
+        }
+        
+        .friend-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+        
+        .friend-item:hover {
+            background: #e8f4fd;
+        }
+        
+        .friend-item.active {
+            background: #e3f2fd;
+            border-left-color: #3498db;
+        }
+        
+        .friend-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        
+        .friend-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .friend-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 2px;
+        }
+        
+        .friend-username-text {
+            font-size: 12px;
+            color: #95a5a6;
+        }
+        
+        .friend-delete-btn {
+            background: none;
+            border: none;
+            color: #e74c3c;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            opacity: 0;
+        }
+        
+        .friend-item:hover .friend-delete-btn {
+            opacity: 1;
+        }
+        
+        .friend-delete-btn:hover {
+            background: #fde8e8;
+        }
+        
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #f5f7fa;
+        }
+        
+        .chat-placeholder {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #95a5a6;
+        }
+        
+        .chat-placeholder h3 {
+            color: #7f8c8d;
+            margin-bottom: 8px;
+        }
+        
+        .chat-header {
+            padding: 15px 20px;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .chat-header .friend-avatar {
+            width: 36px;
+            height: 36px;
+            font-size: 14px;
+        }
+        
+        .chat-header-info h4 {
+            font-size: 16px;
+            color: #2c3e50;
+            margin-bottom: 2px;
+        }
+        
+        .chat-header-info .typing-indicator {
+            font-size: 12px;
+            color: #27ae60;
+            font-style: italic;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .message-wrapper {
+            display: flex;
+            max-width: 70%;
+        }
+        
+        .message-wrapper.sent {
+            align-self: flex-end;
+        }
+        
+        .message-wrapper.received {
+            align-self: flex-start;
+        }
+        
+        .message-bubble {
+            padding: 10px 16px;
+            border-radius: 18px;
+            word-break: break-word;
+            position: relative;
+        }
+        
+        .message-wrapper.sent .message-bubble {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message-wrapper.received .message-bubble {
+            background: white;
+            color: #333;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        
+        .message-text {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .message-file {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+        }
+        
+        .message-file-icon {
+            font-size: 28px;
+            flex-shrink: 0;
+        }
+        
+        .message-file-icon.zip {
+            color: #e67e22;
+        }
+        
+        .message-file-icon.excel {
+            color: #27ae60;
+        }
+        
+        .message-file-info {
+            min-width: 0;
+        }
+        
+        .message-file-name {
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+        
+        .message-file-size {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+        
+        .message-wrapper.sent .message-file-info {
+            color: white;
+        }
+        
+        .message-wrapper.received .message-file-info {
+            color: #333;
+        }
+        
+        .message-file-download {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        
+        .message-wrapper.sent .message-file-download {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        
+        .message-wrapper.sent .message-file-download:hover {
+            background: rgba(255,255,255,0.35);
+        }
+        
+        .message-wrapper.received .message-file-download {
+            background: #e8f4fd;
+            color: #3498db;
+        }
+        
+        .message-wrapper.received .message-file-download:hover {
+            background: #d4e9fa;
+        }
+        
+        .message-time {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 4px;
+            text-align: right;
+        }
+        
+        .chat-input-area {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+        }
+        
+        .chat-input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+        
+        .chat-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 24px;
+            font-size: 14px;
+            resize: none;
+            max-height: 100px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+        
+        .chat-input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+        
+        .chat-input-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .chat-send-btn {
+            width: 44px;
+            height: 44px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+        
+        .chat-send-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 10px rgba(52, 152, 219, 0.3);
+        }
+        
+        .chat-file-btn {
+            width: 44px;
+            height: 44px;
+            border: 2px solid #e0e0e0;
+            border-radius: 50%;
+            background: white;
+            color: #7f8c8d;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+        
+        .chat-file-btn:hover {
+            border-color: #3498db;
+            color: #3498db;
+            background: #e8f4fd;
+        }
+        
+        .chat-file-btn input[type="file"] {
+            display: none;
+        }
+        
+        .upload-progress {
+            padding: 8px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            display: none;
+        }
+        
+        .upload-progress-bar {
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .upload-progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+        
+        .upload-progress-text {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+        
+        @media (max-width: 768px) {
+            .chat-container {
+                flex-direction: column;
+                height: auto;
+            }
+            
+            .chat-sidebar {
+                width: 100%;
+                min-width: 100%;
+                max-height: 250px;
+            }
+            
+            .chat-main {
+                min-height: 400px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -797,6 +1311,10 @@
                 <a href="#" id="usersTab">
                     <i class="fas fa-users"></i>
                     <span>用户管理</span>
+                </a>
+                <a href="/chat" id="chatTab">
+                    <i class="fas fa-comments"></i>
+                    <span>好友聊天</span>
                 </a>
                 <a href="#" id="refreshBtn">
                     <i class="fas fa-sync-alt"></i>
@@ -978,6 +1496,7 @@
                     </div>
                 </div>
             </div>
+            
         </div>
     </div>
     
@@ -1251,7 +1770,7 @@
         
         // 分页相关变量
         let currentPage = 1;
-        let itemsPerPage = 100; // 每页最多显示100个货号
+        let itemsPerPage = 500; // 每页最多显示500个货号
         let currentStatus = 'all'; // 当前显示的状态：all, exported, unexported
         
         // 滚动到顶部
@@ -1518,18 +2037,26 @@
         });
         
         let lazyObserver = null;
-        
+        let groupObserver = null;
+        const preloadedImages = new Set();
+
         function initLazyLoad() {
             if (lazyObserver) {
                 lazyObserver.disconnect();
             }
-            
+
             lazyObserver = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
                         const img = entry.target;
                         const dataSrc = img.getAttribute('data-src');
                         if (dataSrc) {
+                            img.onload = function() {
+                                img.classList.add('loaded');
+                            };
+                            img.onerror = function() {
+                                img.classList.add('loaded');
+                            };
                             img.src = dataSrc;
                             img.removeAttribute('data-src');
                         }
@@ -1537,15 +2064,87 @@
                     }
                 });
             }, {
-                rootMargin: '200px',
+                rootMargin: '300px',
                 threshold: 0.01
             });
-            
+
             document.querySelectorAll('img[data-src]').forEach(img => {
                 lazyObserver.observe(img);
             });
         }
-        
+
+        function initGroupLazyLoad() {
+            if (groupObserver) {
+                groupObserver.disconnect();
+            }
+
+            groupObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const group = entry.target;
+                        group.style.opacity = '1';
+                        group.style.transform = 'translateY(0)';
+
+                        const imgs = group.querySelectorAll('img[data-src]');
+                        imgs.forEach((img, idx) => {
+                            setTimeout(() => {
+                                const dataSrc = img.getAttribute('data-src');
+                                if (dataSrc) {
+                                    img.onload = function() {
+                                        img.classList.add('loaded');
+                                    };
+                                    img.onerror = function() {
+                                        img.classList.add('loaded');
+                                    };
+                                    img.src = dataSrc;
+                                    img.removeAttribute('data-src');
+                                }
+                            }, idx * 80);
+                        });
+
+                        groupObserver.unobserve(group);
+                    }
+                });
+            }, {
+                rootMargin: '200px',
+                threshold: 0.05
+            });
+
+            document.querySelectorAll('.product-group').forEach(group => {
+                groupObserver.observe(group);
+            });
+        }
+
+        function preloadNextPageImages() {
+            const nextPageBtn = document.querySelector('button[onclick^="changePage"]:not([disabled])');
+            if (!nextPageBtn) return;
+
+            const imgs = document.querySelectorAll('img[data-src]');
+            const visibleImgs = Array.from(imgs).slice(0, 6);
+            visibleImgs.forEach(img => {
+                const dataSrc = img.getAttribute('data-src');
+                if (dataSrc && !preloadedImages.has(dataSrc)) {
+                    const preloadImg = new Image();
+                    preloadImg.src = dataSrc;
+                    preloadedImages.add(dataSrc);
+                }
+            });
+        }
+
+        function showSkeletonLoading() {
+            var container = document.getElementById('photosContainer');
+            var html = '<div style="padding: 20px;">';
+            for (var i = 0; i < 3; i++) {
+                html += '<div class="skeleton-group"><div class="skeleton-header"><div class="skeleton skeleton-checkbox"></div><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-count"></div></div><div class="skeleton-grid">';
+                for (var j = 0; j < 6; j++) {
+                    html += '<div class="skeleton skeleton-item"></div>';
+                }
+                html += '</div></div>';
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
         let realtimeRefreshInterval;
         let refreshDebounceTimer = null;
         
@@ -1622,13 +2221,8 @@
         async function loadPhotos() {
             return new Promise(async (resolve, reject) => {
                 try {
-                    // 显示加载状态
-                    document.getElementById('photosContainer').innerHTML = `
-                        <div class="loading-state">
-                            <div class="loading-spinner"></div>
-                            <div class="loading-text">加载中...</div>
-                        </div>
-                    `;
+                    // 显示骨架屏加载状态
+                    showSkeletonLoading();
                     
                     // 获取用户的共享信息（包括已解散的房间）
                     let userShares = [];
@@ -1858,6 +2452,39 @@
                 return groups;
             }, {});
             
+            // 合并同一原始货号的分组（去除batchId后相同的货号）
+            // 这样可以避免同一批照片因为重试上传而被分成多组
+            const mergedGroups = {};
+            Object.keys(groupedPhotos).forEach(groupKey => {
+                let originalProductCode = groupKey;
+                
+                // 1. 先处理下划线分隔的情况（如 123-1_1774004192518）
+                if (originalProductCode.includes('_')) {
+                    const parts = originalProductCode.split('_');
+                    if (parts.length > 1) {
+                        originalProductCode = parts[0];
+                    }
+                }
+                
+                // 2. 找到第一个13位时间戳位置，提取其之前的内容作为原始货号
+                // 时间戳格式：1778061007947 (13位数字)
+                const timestampMatch = originalProductCode.match(/(\d{13})/);
+                if (timestampMatch && timestampMatch.index !== undefined) {
+                    originalProductCode = originalProductCode.substring(0, timestampMatch.index);
+                }
+                
+                // 3. 清理货号，确保只包含字母、数字、连字符和斜杠，并去除末尾的连字符
+                originalProductCode = originalProductCode.replace(/[^a-zA-Z0-9-/]/g, '').trim();
+                originalProductCode = originalProductCode.replace(/-+$/, '');
+                
+                // 使用原始货号作为合并后的分组键
+                if (!mergedGroups[originalProductCode]) {
+                    mergedGroups[originalProductCode] = [];
+                }
+                // 将该组的所有照片添加到合并后的组中
+                mergedGroups[originalProductCode] = mergedGroups[originalProductCode].concat(groupedPhotos[groupKey]);
+            });
+            
             const container = document.getElementById('photosContainer');
             
             if (filteredPhotos.length === 0) {
@@ -1888,10 +2515,10 @@
             const selectedProductCodesSet = new Set(currentSelected);
             
             // 对货号分组进行排序，新入的货号排在顶部
-            const sortedProductCodes = Object.keys(groupedPhotos).sort((a, b) => {
+            const sortedProductCodes = Object.keys(mergedGroups).sort((a, b) => {
                 // 获取每个货号分组中最新照片的时间戳
                 function getLatestTimestamp(productCode) {
-                    const photos = groupedPhotos[productCode];
+                    const photos = mergedGroups[productCode];
                     if (photos.length === 0) return 0;
                     // 找到时间戳最大的照片
                     return Math.max(...photos.map(photo => new Date(photo.timestamp).getTime()));
@@ -1917,7 +2544,7 @@
             currentPageProductCodes.forEach((groupKey, index) => {
                 // 生成唯一ID，格式为 product-group-1, product-group-2 等（倒序）
                 const groupId = `product-group-${(sortedProductCodes.length - startIndex - index)}`;
-                let productPhotos = groupedPhotos[groupKey];
+                let productPhotos = mergedGroups[groupKey];
                 
                 // 从分组键中提取原始货号，去除所有批次ID和时间戳
                 let productCode = groupKey;
@@ -2005,13 +2632,14 @@
                 
                 productPhotos.forEach(photo => {
                     const encodedPath = encodeURI(photo.path);
+                    const safeProductCode = photo.productCode || '';
                     html += `
                         <div class="photo-item">
                             <div class="photo-container">
-                                <img loading="lazy" src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 width%3D%22200%22 height%3D%22150%22 viewBox%3D%220 0 200 150%22%3E%3Crect width%3D%22200%22 height%3D%22150%22 fill%3D%22%23f0f0f0%22%3E%3C%2Frect%3E%3Ctext x%3D%22100%22 y%3D%2285%22 font-family%3D%22Arial%22 font-size%3D%2214%22 text-anchor%3D%22middle%22 fill%3D%22%23999%22%3E加载中%3C%2Ftext%3E%3C%2Fsvg%3E" data-src="${encodedPath}" alt="${photo.filename}" onclick="viewPhoto(${photo.id}, '${encodedPath}', '${photo.filename}', '${photo.productCode}', '${photo.timestamp}', '${photo.username}')" style="cursor: pointer;" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 width%3D%22200%22 height%3D%22150%22 viewBox%3D%220 0 200 150%22%3E%3Crect width%3D%22200%22 height%3D%22150%22 fill%3D%22%23f0f0f0%22%3E%3C%2Frect%3E%3Ctext x%3D%22100%22 y%3D%2285%22 font-family%3D%22Arial%22 font-size%3D%2214%22 text-anchor%3D%22middle%22 fill%3D%22%23999%22%3E图片不存在%3C%2Ftext%3E%3C%2Fsvg%3E'; this.onerror=null;">
+                                <img loading="lazy" src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 width%3D%22200%22 height%3D%22150%22 viewBox%3D%220 0 200 150%22%3E%3Crect width%3D%22200%22 height%3D%22150%22 fill%3D%22%23f0f0f0%22%3E%3C%2Frect%3E%3Ctext x%3D%22100%22 y%3D%2285%22 font-family%3D%22Arial%22 font-size%3D%2214%22 text-anchor%3D%22middle%22 fill%3D%22%23999%22%3E加载中%3C%2Ftext%3E%3C%2Fsvg%3E" data-src="${encodedPath}" alt="${photo.filename}" onclick="viewPhoto(${photo.id}, '${encodedPath}', '${photo.filename}', '${safeProductCode}', '${photo.timestamp}', '${photo.username}')" style="cursor: pointer;" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 width%3D%22200%22 height%3D%22150%22 viewBox%3D%220 0 200 150%22%3E%3Crect width%3D%22200%22 height%3D%22150%22 fill%3D%22%23f0f0f0%22%3E%3C%2Frect%3E%3Ctext x%3D%22100%22 y%3D%2285%22 font-family%3D%22Arial%22 font-size%3D%2214%22 text-anchor%3D%22middle%22 fill%3D%22%23999%22%3E图片不存在%3C%2Ftext%3E%3C%2Fsvg%3E'; this.onerror=null;">
                                 <div class="photo-overlay">
                                     <div class="overlay-actions">
-                                        <button class="overlay-btn view" onclick="viewPhoto(${photo.id}, '${encodedPath}', '${photo.filename}', '${photo.productCode}', '${photo.timestamp}', '${photo.username}')">
+                                        <button class="overlay-btn view" onclick="viewPhoto(${photo.id}, '${encodedPath}', '${photo.filename}', '${safeProductCode}', '${photo.timestamp}', '${photo.username}')">
                                             <i class="fas fa-eye"></i>
                                         </button>
                                         <button class="overlay-btn delete" onclick="confirmDeletePhoto(${photo.id})">
@@ -2059,9 +2687,13 @@
             }
             
             container.innerHTML = html;
-            
-            initLazyLoad();
-            
+
+            requestAnimationFrame(function() {
+                initLazyLoad();
+                initGroupLazyLoad();
+                preloadNextPageImages();
+            });
+
             const productCheckboxes = document.querySelectorAll('.product-checkbox');
             const selectAllCheckbox = document.getElementById('selectAllCheckbox');
             if (productCheckboxes.length > 0) {
@@ -2070,7 +2702,7 @@
             } else {
                 selectAllCheckbox.checked = false;
             }
-            
+
             // 更新选中信息
             updateSelectionInfo();
     }
@@ -2220,7 +2852,7 @@
             // 检查照片的货号是否在选中的分组键中
             return selectedCodes.some(groupKey => {
                 let groupProductCode = groupKey.split('_')[0];
-                let photoProductCode = photo.productCode;
+                let photoProductCode = photo.productCode || '';
                 
                 // 提取原始货号，去除批次ID和后缀
                 if (groupProductCode.includes('-') && groupProductCode.split('-').length > 2) {
@@ -2235,6 +2867,14 @@
                 }
                 if (photoProductCode.match(/^\d+-\d+$/)) {
                     photoProductCode = photoProductCode.split('-')[0];
+                }
+                
+                // 如果 photoProductCode 为空，尝试用 filename 匹配
+                if (!photoProductCode && photo.filename) {
+                    const filenameBase = photo.filename.replace(/\.[^/.]+$/, '').split(/[-_\s]/)[0];
+                    if (filenameBase && groupProductCode.replace(/\s+/g, '').toLowerCase() === filenameBase.toLowerCase()) {
+                        return true;
+                    }
                 }
                 
                 return groupProductCode.replace(/\s+/g, '') === photoProductCode.replace(/\s+/g, '');
@@ -2258,30 +2898,55 @@
         let exportCanceled = false;
         
         try {
-            // 按货号和批次分组，保留完整的productCode以区分不同批次
-            const groupedPhotos = photosToExport.reduce((groups, photo) => {
-                if (!photo) return groups;
-                // 使用完整的productCode作为分组键，以区分不同批次的相同货号
-                const groupKey = photo.productCode || '未分类';
-                if (!groups[groupKey]) {
-                    groups[groupKey] = [];
+            // 按用户勾选的货号分组，使用selectedCodes作为键确保匹配
+            const groupedPhotos = {};
+            selectedCodes.forEach(groupKey => {
+                groupedPhotos[groupKey] = [];
+            });
+
+            photosToExport.forEach(photo => {
+                if (!photo) return;
+                for (const groupKey of selectedCodes) {
+                    let groupProductCode = groupKey;
+                    let photoProductCode = photo.productCode || '';
+
+                    if (groupProductCode.includes('_')) {
+                        groupProductCode = groupProductCode.split('_')[0];
+                    }
+                    if (groupProductCode.includes('-') && groupProductCode.split('-').length > 2) {
+                        groupProductCode = groupProductCode.split('-').slice(0, 2).join('-');
+                    }
+                    if (photoProductCode.includes('-') && photoProductCode.split('-').length > 2) {
+                        photoProductCode = photoProductCode.split('-').slice(0, 2).join('-');
+                    }
+                    if (groupProductCode.match(/^\d+-\d+$/)) {
+                        groupProductCode = groupProductCode.split('-')[0];
+                    }
+                    if (photoProductCode.match(/^\d+-\d+$/)) {
+                        photoProductCode = photoProductCode.split('-')[0];
+                    }
+
+                    // 如果 photoProductCode 为空，尝试用 filename 匹配
+                    if (!photoProductCode && photo.filename) {
+                        const filenameBase = photo.filename.replace(/\.[^/.]+$/, '').split(/[-_\s]/)[0];
+                        if (filenameBase && groupProductCode.replace(/\s+/g, '').toLowerCase() === filenameBase.toLowerCase()) {
+                            groupedPhotos[groupKey].push(photo);
+                            break;
+                        }
+                    }
+
+                    if (groupProductCode.replace(/\s+/g, '') === photoProductCode.replace(/\s+/g, '')) {
+                        groupedPhotos[groupKey].push(photo);
+                        break;
+                    }
                 }
-                groups[groupKey].push(photo);
-                return groups;
-            }, {});
-            
-            // 按照用户勾选的货号顺序排序，使用完整的groupKey
+            });
+
+            // 按照用户勾选的货号顺序排序
             const productCodes = [];
             selectedCodes.forEach(groupKey => {
                 if (!productCodes.includes(groupKey)) {
                     productCodes.push(groupKey);
-                }
-            });
-            
-            // 确保所有选中的货号都被包含，即使没有照片
-            productCodes.forEach(productCode => {
-                if (!groupedPhotos[productCode]) {
-                    groupedPhotos[productCode] = [];
                 }
             });
             
@@ -2329,27 +2994,55 @@
             // 更新进度条
             updateExportProgress(0, '正在准备导出表格...');
             
+            // 计算最大照片数量，用于动态生成列
+            let maxPhotos = 0;
+            for (const productCode of productCodes) {
+                const productPhotos = groupedPhotos[productCode];
+                if (productPhotos && productPhotos.length > maxPhotos) {
+                    maxPhotos = productPhotos.length;
+                }
+            }
+            
+            // 辅助函数：根据索引生成Excel列字母（支持超过26列）
+            function getColLetter(index) {
+                let letter = '';
+                let i = index;
+                while (i >= 0) {
+                    letter = String.fromCharCode(65 + (i % 26)) + letter;
+                    i = Math.floor(i / 26) - 1;
+                }
+                return letter;
+            }
+            
             // 创建新的Excel工作簿
             const workbook = new ExcelJS.Workbook();
             const worksheet = workbook.addWorksheet('照片导出');
             
-            // 设置标题行
+            // 设置标题行 - 动态生成
             worksheet.getCell('A1').value = '货号';
-            worksheet.getCell('B1').value = '3(1)插图';
-            worksheet.getCell('C1').value = '3(2)插图';
-            worksheet.getCell('D1').value = '3(3)插图';
-            worksheet.getCell('E1').value = '3(4)插图';
-            worksheet.getCell('F1').value = '3(5)插图';
-            worksheet.getCell('G1').value = '3(6)插图';
-            
-            // 设置列宽
             worksheet.getColumn('A').width = 20;
-            worksheet.getColumn('B').width = 30;
-            worksheet.getColumn('C').width = 30;
-            worksheet.getColumn('D').width = 30;
-            worksheet.getColumn('E').width = 30;
-            worksheet.getColumn('F').width = 30;
-            worksheet.getColumn('G').width = 30;
+            
+            for (let i = 0; i < maxPhotos; i++) {
+                const colLetter = getColLetter(i + 1); // B, C, D, ... (从第2列开始)
+                worksheet.getCell(colLetter + '1').value = '3(' + (i + 1) + ')插图';
+                worksheet.getColumn(colLetter).width = 30;
+            }
+
+            // 创建调试工作表
+            var debugWs = workbook.addWorksheet('调试信息');
+            debugWs.getCell('A1').value = '步骤';
+            debugWs.getCell('B1').value = '状态';
+            debugWs.getCell('C1').value = '详情';
+            debugWs.getColumn('A').width = 30;
+            debugWs.getColumn('B').width = 15;
+            debugWs.getColumn('C').width = 80;
+            var debugRow = 2;
+            debugWs.getCell('A' + debugRow).value = 'ExcelJS版本';
+            debugWs.getCell('B' + debugRow).value = '4.3.0';
+            debugRow++;
+            debugWs.getCell('A' + debugRow).value = '测试图片添加';
+            debugWs.getCell('B' + debugRow).value = typeof testImageId !== 'undefined' ? '成功(id:' + testImageId + ')' : '失败';
+            debugRow++;
             
             // 处理每个货号
             let rowIndex = 2; // 从第二行开始
@@ -2412,92 +3105,129 @@
                 // 设置行高
                 worksheet.getRow(rowIndex).height = 200;
                 
-                // 填充照片到对应的列
-                for (let colIndex = 0; colIndex < productPhotos.length && colIndex < 6; colIndex++) {
+                // 填充照片到对应的列（不限制数量）
+                for (let colIndex = 0; colIndex < productPhotos.length; colIndex++) {
                     if (exportCanceled) {
                         throw new Error('导出已取消');
                     }
                     
                     const photo = productPhotos[colIndex];
-                    const colLetter = String.fromCharCode(66 + colIndex); // B, C, D, E, F, G
-                    const cellAddress = `${colLetter}${rowIndex}`;
+                    const colLetter = getColLetter(colIndex + 1); // B, C, D, E, F, G, H, I...
+                    const cellAddress = colLetter + rowIndex;
                     
                     // 构建完整的图片URL - 使用当前页面的域名
                     let imageUrl = photo.path;
                     if (!imageUrl.startsWith('http')) {
-                        // 如果是相对路径，使用当前页面的域名
                         const currentDomain = window.location.origin;
+                        if (!imageUrl.startsWith('/')) {
+                            imageUrl = '/' + imageUrl;
+                        }
                         imageUrl = currentDomain + imageUrl;
                     }
                     
                     // 更新进度
                     processedPhotos++;
                     const progress = (processedPhotos / totalPhotos) * 85;
-                    updateExportProgress(progress, `正在导出表格: ${productCode} - ${photo.filename}...`);
+                    updateExportProgress(progress, '正在导出表格: ' + productCode + ' - ' + photo.filename + '...');
                     
                     // 下载图片并嵌入到Excel
-                    const promise = fetch(imageUrl, {
+                    const ext = (function() {
+                        if (!photo.filename) return 'jpeg';
+                        const lf = photo.filename.toLowerCase();
+                        if (lf.endsWith('.png')) return 'png';
+                        if (lf.endsWith('.gif')) return 'gif';
+                        return 'jpeg';
+                    })();
+
+                    const curCellAddress = cellAddress;
+                    const curPhoto = photo;
+                    const curImageUrl = imageUrl;
+                    const curColIndex = colIndex;
+                    const curRowIndex = rowIndex;
+                    const curDebugRow = debugRow;
+                    debugRow++;
+
+                    debugWs.getCell('A' + curDebugRow).value = curPhoto.filename || '未知';
+                    debugWs.getCell('C' + curDebugRow).value = 'URL: ' + curImageUrl;
+
+                    const promise = fetch(curImageUrl, {
                         method: 'GET',
-                        headers: {
-                            'Accept': 'image/*'
-                        }
+                        headers: { 'Accept': 'image/*' },
+                        cache: 'default'
                     })
-                        .then(response => {
+                        .then(function(response) {
                             if (!response.ok) {
-                                // 图片不存在，返回错误
-                                throw new Error('图片不存在');
+                                throw new Error('HTTP ' + response.status);
                             }
-                            return response.blob();
+                            var ct = response.headers.get('content-type') || '';
+                            var detectedExt = ext;
+                            if (ct.indexOf('image/png') !== -1) detectedExt = 'png';
+                            else if (ct.indexOf('image/gif') !== -1) detectedExt = 'gif';
+                            else if (ct.indexOf('image/webp') !== -1) detectedExt = 'jpeg';
+                            debugWs.getCell('C' + curDebugRow).value += ' | CT: ' + ct + ' | Ext: ' + detectedExt;
+                            return response.blob().then(function(blob) {
+                                return { blob: blob, detectedExt: detectedExt };
+                            });
                         })
-                        .then(blob => {
-                            return new Promise((resolve, reject) => {
-                                const reader = new FileReader();
-                                reader.onload = async () => {
+                        .then(function(data) {
+                            var blob = data.blob;
+                            var detectedExt = data.detectedExt;
+                            if (!blob || blob.size === 0) {
+                                throw new Error('图片数据为空');
+                            }
+                            debugWs.getCell('C' + curDebugRow).value += ' | BlobSize: ' + blob.size;
+                            return new Promise(function(resolve, reject) {
+                                var reader = new FileReader();
+                                reader.onload = function() {
+                                    var result = reader.result;
+                                    if (!result || result.length < 100) {
+                                        reject(new Error('读取图片数据失败(len=' + (result ? result.length : 0) + ')'));
+                                        return;
+                                    }
+                                    var commaIdx = result.indexOf(',');
+                                    if (commaIdx === -1) {
+                                        reject(new Error('图片数据格式错误(无逗号)'));
+                                        return;
+                                    }
+                                    var base64Part = result.substring(commaIdx + 1);
+                                    if (!base64Part || base64Part.length < 50) {
+                                        reject(new Error('图片base64数据无效(len=' + (base64Part ? base64Part.length : 0) + ')'));
+                                        return;
+                                    }
+                                    debugWs.getCell('C' + curDebugRow).value += ' | B64Len: ' + base64Part.length;
                                     try {
-                                        // 压缩图片
-                                        const compressedBase64 = await compressImage(reader.result, 0.7); // 0.7 是压缩质量
-                                        
-                                        // 嵌入图片
-                                        const imageId = workbook.addImage({
-                                            base64: compressedBase64,
-                                            extension: 'jpeg',
+                                        var imageId = workbook.addImage({
+                                            base64: base64Part,
+                                            extension: detectedExt
                                         });
-                                        
-                                        // 计算图片位置
-                                        const cell = worksheet.getCell(cellAddress);
-                                        const startCol = cell.col - 1;
-                                        const startRow = cell.row - 1;
-                                        
-                                        // 添加图片到工作表
+                                        debugWs.getCell('C' + curDebugRow).value += ' | ImgId: ' + imageId;
                                         worksheet.addImage(imageId, {
-                                            tl: { col: startCol, row: startRow },
-                                            br: { col: startCol + 1, row: startRow + 1 },
-                                            editAs: 'oneCell'
+                                            tl: { col: curColIndex + 1, row: curRowIndex - 1 },
+                                            br: { col: curColIndex + 2, row: curRowIndex }
                                         });
+                                        debugWs.getCell('B' + curDebugRow).value = '成功';
+                                        debugWs.getCell('C' + curDebugRow).value += ' | tl(col=' + (curColIndex + 1) + ',row=' + (curRowIndex - 1) + ') br(col=' + (curColIndex + 2) + ',row=' + curRowIndex + ')';
                                         resolve();
-                                    } catch (error) {
-                                        console.error(`嵌入图片 ${imageUrl} 失败:`, error);
-                                        // 如果嵌入失败，显示错误信息
-                                        worksheet.getCell(cellAddress).value = '图片嵌入失败';
-                                        failedExports.push({
-                                            filename: photo.filename,
-                                            productCode: photo.productCode || '未知货号',
-                                            error: error.message
-                                        });
-                                        resolve();
+                                    } catch(imgErr) {
+                                        debugWs.getCell('B' + curDebugRow).value = 'addImage异常';
+                                        debugWs.getCell('C' + curDebugRow).value += ' | Err: ' + imgErr.message;
+                                        reject(imgErr);
                                     }
                                 };
-                                reader.onerror = reject;
+                                reader.onerror = function() {
+                                    reject(new Error('FileReader读取失败'));
+                                };
                                 reader.readAsDataURL(blob);
                             });
                         })
-                        .catch(error => {
-                            console.error(`处理图片 ${imageUrl} 失败:`, error);
-                            // 如果图片下载失败，显示错误信息
-                            worksheet.getCell(cellAddress).value = '图片不存在';
+                        .catch(function(error) {
+                            console.error('处理图片 ' + curImageUrl + ' 失败:', error);
+                            debugWs.getCell('B' + curDebugRow).value = '失败';
+                            debugWs.getCell('C' + curDebugRow).value += ' | CatchErr: ' + error.message;
+                            worksheet.getCell(curCellAddress).value = error.message || '图片嵌入失败';
                             failedExports.push({
-                                filename: photo.filename,
-                                productCode: photo.productCode || '未知货号',
+                                filename: curPhoto.filename,
+                                productCode: curPhoto.productCode || '未知货号',
                                 error: error.message
                             });
                         });
@@ -2560,27 +3290,33 @@
             URL.revokeObjectURL(url);
             
             // 标记导出的照片为已导出并更新服务器
-            const exportStatusPromises = [];
+            // 收集所有要更新的照片ID
+            const photoIdsToUpdate = [];
             for (let i = 0; i < photosToExport.length; i++) {
                 const photo = photosToExport[i];
                 if (photo) {
                     photo.exported = true;
-                    exportStatusPromises.push(
-                        fetch(`/api/photos/${photo.id}/exported`, {
-                            method: 'PUT',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ exported: true })
-                        }).catch(error => {
-                            console.error('更新导出状态失败:', error);
-                        })
-                    );
+                    photoIdsToUpdate.push(photo.id);
                 }
             }
             
-            // 等待所有服务器更新完成后再刷新界面
-            await Promise.all(exportStatusPromises);
+            // 使用批量更新API，一次性更新所有导出状态，避免并发冲突
+            if (photoIdsToUpdate.length > 0) {
+                try {
+                    await fetch('/api/photos/batch/exported', {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ ids: photoIdsToUpdate, exported: true })
+                    });
+                } catch (error) {
+                    console.error('批量更新导出状态失败:', error);
+                }
+            }
+            
+            // 额外延迟，确保服务器端文件写入完成
+            await new Promise(resolve => setTimeout(resolve, 500));
             
             // 更新统计数据
             updateStats();
@@ -2635,7 +3371,10 @@
                 // 检查照片的货号是否在选中的分组键中
                 const isSelected = selectedProductCodes.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
-                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
+                    const photoProductCode = (photo.productCode || '').replace(/\s+/g, '');
+                    // groupKey 是处理后的原始货号（如 "684"），photo.productCode 是完整格式（如 "684-1778xxx"）
+                    // 所以应该检查 photo.productCode 是否以 groupKey 开头
+                    return photoProductCode === groupProductCode || photoProductCode.startsWith(groupProductCode + '-');
                 });
                 if (isSelected) {
                     photosToExport.push(photo);
@@ -2717,7 +3456,10 @@
                 // 检查照片的货号是否在选中的分组键中
                 return selectedCodes.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
-                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
+                    const photoProductCode = (photo.productCode || '').replace(/\s+/g, '');
+                    // groupKey 是处理后的原始货号（如 "684"），photo.productCode 是完整格式（如 "684-1778xxx"）
+                    // 所以应该检查 photo.productCode 是否以 groupKey 开头
+                    return photoProductCode === groupProductCode || photoProductCode.startsWith(groupProductCode + '-');
                 });
             });
         }
@@ -2740,102 +3482,133 @@
             }
             
             // 更新进度条
-            updateExportProgress(0, '正在准备导出图片...');
+            updateExportProgress(0, '正在准备导出...');
             
-            let successfullyExported = 0;
+            const validPhotos = photosToExport.filter(p => p && p.filename && p.path);
+            const totalPhotos = validPhotos.length;
             
-            // 为每张照片创建下载链接并添加到压缩包
-            const downloadPromises = [];
-            
-            photosToExport.forEach((photo, i) => {
-                if (!photo || !photo.filename || !photo.path) return;
+            // 收集文件路径和导出文件名，并逐步更新进度
+            const photoPaths = [];
+            const photoFilenames = [];
+            for (let i = 0; i < validPhotos.length; i++) {
+                const p = validPhotos[i];
+                photoPaths.push(p.path);
+                photoFilenames.push(p.filename);
                 
-                const promise = (async () => {
-                    try {
-                        const encodedPath = encodeURI(photo.path);
-                        const response = await fetch(encodedPath);
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        const blob = await response.blob();
-                        
-                        // 添加到压缩包
-                        exportZip.file(photo.filename, blob);
-                        successfullyExported++;
-                        
-                        // 更新进度条
-                        updateExportProgress((i / photosToExport.length) * 100, `正在导出图片: ${photo.filename}...`);
-                    } catch (error) {
-                        console.error(`处理照片 ${photo.filename} 失败:`, error);
+                // 每处理10张或最后一张更新进度
+                if (i % 10 === 0 || i === validPhotos.length - 1) {
+                    const progress = (i / validPhotos.length) * 30;
+                    updateExportProgress(progress, `正在准备文件: ${i + 1}/${validPhotos.length}...`);
+                    // 小延迟让UI有机会更新
+                    await new Promise(resolve => setTimeout(resolve, 1));
+                }
+            }
+            
+            // 模拟服务端生成ZIP的进度
+            const encouragingMessages = [
+                '正在努力打包中...',
+                '快好啦，请耐心等待哦 😊',
+                '正在压缩图片文件...',
+                '马上就好，再等等~',
+                '正在整理您的照片...',
+                '加油加油，就快完成了！',
+                '还差一点点啦...',
+                '正在做最后的准备工作...'
+            ];
+            let zipProgress = 30;
+            let messageIndex = 0;
+            let messageTimer = 0;
+            const zipProgressInterval = setInterval(() => {
+                if (zipProgress < 80) {
+                    zipProgress += Math.random() * 3;
+                    messageTimer++;
+                    // 每10次更新换一条温馨提示（更快）
+                    if (messageTimer >= 10) {
+                        messageTimer = 0;
+                        messageIndex = (messageIndex + 1) % encouragingMessages.length;
                     }
-                })();
-                
-                downloadPromises.push(promise);
+                    const message = zipProgress < 50 
+                        ? `正在服务端生成ZIP (${totalPhotos}张)...`
+                        : encouragingMessages[messageIndex];
+                    updateExportProgress(Math.min(zipProgress, 80), message);
+                }
+            }, 100);
+            
+            // 发送到服务端创建ZIP
+            const resp = await fetch('/api/export/zip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paths: photoPaths, filenames: photoFilenames, exportName })
             });
             
-            // 并行下载所有照片
-            await Promise.all(downloadPromises);
+            // 清除进度模拟
+            clearInterval(zipProgressInterval);
             
-            updateExportProgress(90, '正在生成图片压缩包...');
+            if (!resp.ok) {
+                throw new Error(`服务端ZIP创建失败: ${resp.status}`);
+            }
             
-            // 生成压缩包
-            const zipBlob = await exportZip.generateAsync({ type: 'blob' }, function(metadata) {
-                const progress = 90 + (metadata.percent / 10);
-                updateExportProgress(progress, `正在生成图片压缩包...`);
-            });
+            const result = await resp.json();
             
-            updateExportProgress(100, '图片导出完成！');
+            updateExportProgress(90, '正在下载ZIP...');
             
-            // 创建下载链接
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(zipBlob);
-            link.download = `${exportName}.zip`;
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            window.location.href = `/api/export/download/${result.token}?name=${encodeURIComponent(result.filename)}`;
+            
+            updateExportProgress(100, '导出完成！');
+            
+            const processedCount = result.count;
             
             // 标记导出的照片为已导出并更新服务器
+            // 收集所有要更新的照片ID
+            const photoIdsToUpdate = [];
             for (let i = 0; i < photosToExport.length; i++) {
                 const photo = photosToExport[i];
                 if (photo) {
                     photo.exported = true;
-                    // 异步更新服务器上的导出状态
-                    fetch(`/api/photos/${photo.id}/exported`, {
+                    photoIdsToUpdate.push(photo.id);
+                }
+            }
+            
+            // 使用批量更新API，一次性更新所有导出状态，避免并发冲突
+            if (photoIdsToUpdate.length > 0) {
+                try {
+                    await fetch('/api/photos/batch/exported', {
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ exported: true })
-                    }).catch(error => {
-                        console.error('更新导出状态失败:', error);
+                        body: JSON.stringify({ ids: photoIdsToUpdate, exported: true })
                     });
+                } catch (error) {
+                    console.error('批量更新导出状态失败:', error);
                 }
             }
+            
+            // 额外延迟，确保服务器端文件写入完成
+            await new Promise(resolve => setTimeout(resolve, 500));
             
             // 更新统计数据
             updateStats();
             
             // 重新加载数据以更新视图
             const currentViewText = document.getElementById('currentView').textContent;
-            loadPhotos().then(() => {
-                // 恢复视图状态
-                if (currentViewText === '全部照片') {
-                    filterPhotosByExportStatus('all');
-                } else if (currentViewText === '已导出照片') {
-                    filterPhotosByExportStatus('exported');
-                } else if (currentViewText === '未导出照片') {
-                    filterPhotosByExportStatus('unexported');
-                }
-            });
+            await loadPhotos();
+            // 恢复视图状态
+            if (currentViewText === '全部照片') {
+                filterPhotosByExportStatus('all');
+            } else if (currentViewText === '已导出照片') {
+                filterPhotosByExportStatus('exported');
+            } else if (currentViewText === '未导出照片') {
+                filterPhotosByExportStatus('unexported');
+            }
             
             // 关闭进度模态框
             setTimeout(() => {
                 closeModal('exportProgressModal');
                 if (exportExcel) {
-                    alert(`成功导出 ${successfullyExported} 张照片到 ${exportName}.zip\n同时已导出 Excel 表格`);
+                    alert(`成功导出 ${processedCount} 张照片到 ${exportName}.zip\n同时已导出 Excel 表格`);
                 } else {
-                    alert(`成功导出 ${successfullyExported} 张照片到 ${exportName}.zip`);
+                    alert(`成功导出 ${processedCount} 张照片到 ${exportName}.zip`);
                 }
             }, 1000);
         } catch (error) {
@@ -2959,7 +3732,10 @@
                 // 检查照片是否在选中的分组中
                 const isSelected = selectedProductCodesArray.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
-                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
+                    const photoProductCode = (photo.productCode || '').replace(/\s+/g, '');
+                    // groupKey 是处理后的原始货号（如 "684"），photo.productCode 是完整格式（如 "684-1778xxx"）
+                    // 所以应该检查 photo.productCode 是否以 groupKey 开头
+                    return photoProductCode === groupProductCode || photoProductCode.startsWith(groupProductCode + '-');
                 });
                 if (isSelected) {
                     // 检查图片是否存在（通过路径是否有效判断）
@@ -3048,7 +3824,10 @@
                 // 检查照片的货号是否在选中的分组键中
                 return selectedProductCodesArray.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
-                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
+                    const photoProductCode = (photo.productCode || '').replace(/\s+/g, '');
+                    // groupKey 是处理后的原始货号（如 "684"），photo.productCode 是完整格式（如 "684-1778xxx"）
+                    // 所以应该检查 photo.productCode 是否以 groupKey 开头
+                    return photoProductCode === groupProductCode || photoProductCode.startsWith(groupProductCode + '-');
                 });
             });
             selectedPhotosCount = selectedPhotos.length;
@@ -3240,7 +4019,10 @@
                 // 检查照片的货号是否在选中的分组键中
                 const isSelected = selectedCodes.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
-                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
+                    const photoProductCode = (photo.productCode || '').replace(/\s+/g, '');
+                    // groupKey 是处理后的原始货号（如 "684"），photo.productCode 是完整格式（如 "684-1778xxx"）
+                    // 所以应该检查 photo.productCode 是否以 groupKey 开头
+                    return photoProductCode === groupProductCode || photoProductCode.startsWith(groupProductCode + '-');
                 });
                 if (isSelected) {
                     selectedPhotos.push(photo);
@@ -3280,7 +4062,10 @@
                 // 检查照片的货号是否在选中的分组键中
                 const isSelected = selectedProductCodes.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
-                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
+                    const photoProductCode = (photo.productCode || '').replace(/\s+/g, '');
+                    // groupKey 是处理后的原始货号（如 "684"），photo.productCode 是完整格式（如 "684-1778xxx"）
+                    // 所以应该检查 photo.productCode 是否以 groupKey 开头
+                    return photoProductCode === groupProductCode || photoProductCode.startsWith(groupProductCode + '-');
                 });
                 if (isSelected) {
                     photosToDelete.push(photo);
@@ -3353,7 +4138,10 @@
                 // 检查照片的货号是否在选中的分组键中
                 const isSelected = selectedProductCodes.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
-                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
+                    const photoProductCode = (photo.productCode || '').replace(/\s+/g, '');
+                    // groupKey 是处理后的原始货号（如 "684"），photo.productCode 是完整格式（如 "684-1778xxx"）
+                    // 所以应该检查 photo.productCode 是否以 groupKey 开头
+                    return photoProductCode === groupProductCode || photoProductCode.startsWith(groupProductCode + '-');
                 });
                 if (isSelected) {
                     photosToExport.push(photo);
@@ -3435,7 +4223,10 @@
                 // 检查照片的货号是否在选中的分组键中
                 return selectedCodes.some(groupKey => {
                     const groupProductCode = groupKey.split('_')[0];
-                    return groupProductCode.replace(/\s+/g, '') === (photo.productCode || '').replace(/\s+/g, '');
+                    const photoProductCode = (photo.productCode || '').replace(/\s+/g, '');
+                    // groupKey 是处理后的原始货号（如 "684"），photo.productCode 是完整格式（如 "684-1778xxx"）
+                    // 所以应该检查 photo.productCode 是否以 groupKey 开头
+                    return photoProductCode === groupProductCode || photoProductCode.startsWith(groupProductCode + '-');
                 });
             });
         }
@@ -3454,7 +4245,7 @@
         // 统计每个纯货号的出现次数，用于检测重复（区分大小写）
         const productCodeCount = {};
         photosToExport.forEach(photo => {
-            let productCode = photo.productCode;
+            let productCode = photo.productCode || '';
             if (productCode) {
                 // 去除时间戳、随机码和批次ID，只保留纯货号
                 // 先处理下划线分隔的情况（如 123-1_1774004192518）
@@ -3491,145 +4282,119 @@
             }
             
             // 更新进度条
-            updateExportProgress(0, '正在准备导出图片...');
+            updateExportProgress(0, '正在准备导出...');
             
-            let successfullyExported = 0;
+            // 计算导出文件名(含文件夹前缀用于individual模式)
+            const photoPaths = [];
+            const photoFilenames = [];
             const failedExports = [];
+            const totalPhotos = photosToExport.length;
             
-            // 为每张照片创建下载链接并添加到压缩包
-            const downloadPromises = [];
-            
-            photosToExport.forEach((photo, i) => {
+            for (let i = 0; i < photosToExport.length; i++) {
+                const photo = photosToExport[i];
                 if (!photo || !photo.filename || !photo.path) {
                     failedExports.push({
-                        filename: photo ? photo.filename : '未知文件名',
-                        productCode: photo ? photo.productCode : '未知货号',
-                        error: '无效的照片数据'
+                        filename: photo ? photo.filename : '未知',
+                        productCode: photo && photo.productCode ? photo.productCode : '未知',
+                        error: '无效数据'
                     });
-                    return;
+                    continue;
                 }
                 
-                const promise = (async () => {
-                    try {
-                        const encodedPath = encodeURI(photo.path);
-                        const response = await fetch(encodedPath);
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        const blob = await response.blob();
-                        
-                        // 处理文件名，确保去除时间戳和随机码
-                        let exportFilename = photo.filename;
-                        
-                        // 1. 先处理下划线分隔的情况（如 123-1_1774004192518.jpg）
-                        if (exportFilename.includes('_')) {
-                            const parts = exportFilename.split('_');
-                            if (parts.length > 1) {
-                                // 只保留下划线前的部分
-                                exportFilename = parts[0];
-                            }
-                        }
-                        // 2. 再处理连字符分隔的情况（如 123-1-1774004192518.jpg）
-                        else if (exportFilename.includes('-')) {
-                            const parts = exportFilename.split('-');
-                            if (parts.length > 2) {
-                                // 检查最后一部分是否为时间戳（纯数字）
-                                const lastPart = parts[parts.length - 1];
-                                if (/^\d+$/.test(lastPart)) {
-                                    // 只保留前两部分（货号+后缀）
-                                    exportFilename = parts.slice(0, 2).join('-');
-                                }
-                            }
-                        }
-                        
-                        // 3. 提取纯货号，使用与displayPhotos相同的逻辑
-                        let pureProductCode = photo.productCode;
-                        if (pureProductCode) {
-                            // 处理下划线分隔的情况（如 123-1_1774004192518）
-                            if (pureProductCode.includes('_')) {
-                                const parts = pureProductCode.split('_');
-                                if (parts.length > 1) {
-                                    pureProductCode = parts[0];
-                                }
-                            }
-                            // 去除时间戳及之后的部分（时间戳为10-15位数字）
-                            pureProductCode = pureProductCode.replace(/-(\d{10,15})[-\w]*$/, '');
-                            // 清理货号，确保只包含字母、数字和连字符
-                            pureProductCode = pureProductCode.replace(/[^a-zA-Z0-9-]/g, '').trim();
-                        }
-                        
-                        // 确保文件名有扩展名
-                        if (!exportFilename.includes('.')) {
-                            // 从path中提取扩展名
-                            const pathParts = photo.path.split('.');
-                            if (pathParts.length > 1) {
-                                const extension = pathParts.pop();
-                                // 确保是有效的图片扩展名
-                                const validImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-                                if (validImageExtensions.includes(extension.toLowerCase())) {
-                                    exportFilename = `${exportFilename}.${extension}`;
-                                }
-                            }
-                        }
-                        
-                        // 根据导出类型决定如何添加到压缩包
-                        if (exportType === 'individual' && pureProductCode) {
-                            // 按原始货号创建独立文件夹，去除空格
-                            const folderName = pureProductCode.replace(/\s+/g, '');
-                            exportZip.folder(folderName).file(exportFilename, blob);
-                        } else {
-                            // 直接添加到根目录
-                            exportZip.file(exportFilename, blob);
-                        }
-                        
-                        successfullyExported++;
-                        
-                        // 更新进度条
-                        updateExportProgress((i / photosToExport.length) * 100, `正在导出图片: ${photo.filename}...`);
-                    } catch (error) {
-                        console.error(`处理照片 ${photo.filename} 失败:`, error);
-                        failedExports.push({
-                            filename: photo.filename,
-                            productCode: photo.productCode || '未知货号',
-                            error: error.message
-                        });
+                let exportFilename = photo.filename;
+                if (exportFilename.includes('_')) {
+                    exportFilename = exportFilename.split('_')[0];
+                } else if (exportFilename.includes('-')) {
+                    const parts = exportFilename.split('-');
+                    if (parts.length > 2 && /^\d+$/.test(parts[parts.length - 1])) {
+                        exportFilename = parts.slice(0, 2).join('-');
                     }
-                })();
+                }
                 
-                downloadPromises.push(promise);
-            });
-            
-            // 等待所有照片下载完成
-            await Promise.all(downloadPromises);
-            
-            // 处理失败的导出
-            if (failedExports.length > 0) {
-                // 创建失败导出的简易表格
-                const failedExportCSV = generateFailedExportCSV(failedExports);
-                const failedBlob = new Blob([failedExportCSV], { type: 'text/csv;charset=utf-8;' });
+                let pureProductCode = photo.productCode || '';
+                if (pureProductCode) {
+                    if (pureProductCode.includes('_')) {
+                        pureProductCode = pureProductCode.split('_')[0];
+                    }
+                    pureProductCode = pureProductCode.replace(/-(\d{10,15})[-\w]*$/, '');
+                    pureProductCode = pureProductCode.replace(/[^a-zA-Z0-9-]/g, '').trim();
+                }
                 
-                // 添加到压缩包
-                exportZip.file('导出失败列表.csv', failedBlob);
+                if (!exportFilename.includes('.')) {
+                    const ext = (photo.path || '').split('.').pop();
+                    if (ext && ['jpg','jpeg','png','gif','webp'].includes(ext.toLowerCase())) {
+                        exportFilename += '.' + ext;
+                    }
+                }
+                
+                photoPaths.push(photo.path);
+                if (exportType === 'individual' && pureProductCode) {
+                    photoFilenames.push(pureProductCode.replace(/\s+/g, '') + '/' + exportFilename);
+                } else {
+                    photoFilenames.push(exportFilename);
+                }
+                
+                // 每处理10张或最后一张更新进度
+                if (i % 10 === 0 || i === photosToExport.length - 1) {
+                    const progress = (i / photosToExport.length) * 30;
+                    updateExportProgress(progress, `正在准备文件: ${i + 1}/${photosToExport.length}...`);
+                    // 小延迟让UI有机会更新
+                    await new Promise(resolve => setTimeout(resolve, 1));
+                }
             }
             
-            updateExportProgress(90, '正在生成图片压缩包...');
+            // 模拟服务端生成ZIP的进度
+            const encouragingMessages = [
+                '正在努力打包中...',
+                '快好啦，请耐心等待哦 😊',
+                '正在压缩图片文件...',
+                '马上就好，再等等~',
+                '正在整理您的照片...',
+                '加油加油，就快完成了！',
+                '还差一点点啦...',
+                '正在做最后的准备工作...'
+            ];
+            let zipProgress = 30;
+            let messageIndex = 0;
+            let messageTimer = 0;
+            const zipProgressInterval = setInterval(() => {
+                if (zipProgress < 80) {
+                    zipProgress += Math.random() * 3;
+                    messageTimer++;
+                    // 每10次更新换一条温馨提示（更快）
+                    if (messageTimer >= 10) {
+                        messageTimer = 0;
+                        messageIndex = (messageIndex + 1) % encouragingMessages.length;
+                    }
+                    const message = zipProgress < 50 
+                        ? `正在服务端生成ZIP (${photoPaths.length}张)...`
+                        : encouragingMessages[messageIndex];
+                    updateExportProgress(Math.min(zipProgress, 80), message);
+                }
+            }, 100);
             
-            // 生成压缩包
-            const zipBlob = await exportZip.generateAsync({ type: 'blob' }, function(metadata) {
-                const progress = 90 + (metadata.percent / 10);
-                updateExportProgress(progress, `正在生成图片压缩包...`);
+            const resp2 = await fetch('/api/export/zip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paths: photoPaths, filenames: photoFilenames, exportName })
             });
             
-            updateExportProgress(100, '图片导出完成！');
+            // 清除进度模拟
+            clearInterval(zipProgressInterval);
             
-            // 创建下载链接
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(zipBlob);
-            link.download = `${exportName}.zip`;
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            if (!resp2.ok) {
+                throw new Error(`服务端ZIP创建失败: ${resp2.status}`);
+            }
+            
+            const result2 = await resp2.json();
+            
+            updateExportProgress(90, '正在下载ZIP...');
+            
+            window.location.href = `/api/export/download/${result2.token}?name=${encodeURIComponent(result2.filename)}`;
+            
+            updateExportProgress(100, '导出完成！');
+            
+            successfullyExported = result2.count;
             
             // 标记导出的照片为已导出并更新服务器
             const exportStatusPromises = [];
@@ -3831,7 +4596,7 @@
             console.log('开始删除货号所有照片，货号:', productCode);
             
             // 找出该货号的所有照片
-            const productPhotos = allPhotos.filter(photo => photo && photo.productCode === productCode);
+            const productPhotos = allPhotos.filter(photo => photo && (photo.productCode || '') === (productCode || ''));
             const totalCount = productPhotos.length;
             console.log('找到照片数量:', totalCount);
             
@@ -3998,7 +4763,7 @@
         productCode = productCode.replace(/[^a-zA-Z0-9-]/g, '').trim();
         
         let suffix = '';
-        const productPhotos = allPhotos.filter(photo => photo && photo.productCode === groupKey);
+        const productPhotos = allPhotos.filter(photo => photo && (photo.productCode || '') === (groupKey || ''));
         if (productPhotos.length > 0) {
             const firstFilename = productPhotos[0].filename || '';
             if (firstFilename.match(/\(\d+\)/)) {
@@ -4038,12 +4803,11 @@
         const photosToUpdate = [];
         
         const productPhotos = allPhotos.filter(photo => {
-            return photo && photo.productCode === groupKey;
+            return photo && (photo.productCode || '') === (groupKey || '');
         });
         
         allPhotos.forEach(photo => {
-            if (photo && photo.productCode && photo.filename) {
-                if (photo.productCode === groupKey) {
+            if (photo && (photo.productCode || '') === (groupKey || '') && photo.filename) {
                     const photoIndex = productPhotos.indexOf(photo) + 1;
                     
                     let originalExtension = '';
@@ -4072,12 +4836,10 @@
                     photo.productCode = newProductCodeValue;
                     photo.filename = newFilename;
                 }
-            }
         });
         
         filteredPhotos.forEach(photo => {
-            if (photo && photo.productCode && photo.filename) {
-                if (photo.productCode === groupKey) {
+            if (photo && (photo.productCode || '') === (groupKey || '') && photo.filename) {
                     const photoIndex = productPhotos.indexOf(photo) + 1;
                     
                     let originalExtension = '';
@@ -4100,7 +4862,6 @@
                     photo.productCode = newProductCodeValue;
                     photo.filename = newFilename;
                 }
-            }
         });
         
         try {
@@ -4111,7 +4872,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        productCode: photo.productCode,
+                        productCode: photo.productCode || '',
                         filename: photo.filename
                     })
                 });
@@ -4342,30 +5103,53 @@
     // 压缩图片函数
     function compressImage(base64, quality) {
         return new Promise((resolve, reject) => {
+            if (!base64 || typeof base64 !== 'string' || !base64.startsWith('data:')) {
+                reject(new Error('无效的图片数据'));
+                return;
+            }
             const canvas = document.createElement('canvas');
             const img = new Image();
-            
+            var loadTimeout = setTimeout(function() {
+                reject(new Error('图片加载超时'));
+            }, 15000);
+
             img.onload = function() {
-                // 设置画布大小
-                canvas.width = img.width;
-                canvas.height = img.height;
-                
-                // 绘制图片
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                
-                // 压缩图片
-                const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-                
-                // 提取base64部分
-                const base64Part = compressedDataUrl.split(',')[1];
-                resolve(base64Part);
+                clearTimeout(loadTimeout);
+                try {
+                    var maxDimension = 1920;
+                    var width = img.width;
+                    var height = img.height;
+
+                    if (width > maxDimension || height > maxDimension) {
+                        var ratio = Math.min(maxDimension / width, maxDimension / height);
+                        width = Math.round(width * ratio);
+                        height = Math.round(height * ratio);
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    var compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+
+                    var base64Part = compressedDataUrl.split(',')[1];
+                    if (!base64Part || base64Part.length === 0) {
+                        reject(new Error('图片压缩后数据为空'));
+                        return;
+                    }
+                    resolve(base64Part);
+                } catch (e) {
+                    reject(new Error('图片压缩失败: ' + e.message));
+                }
             };
-            
+
             img.onerror = function() {
+                clearTimeout(loadTimeout);
                 reject(new Error('图片加载失败'));
             };
-            
+
             img.src = base64;
         });
     }
@@ -4392,6 +5176,7 @@
                 switchTab('users');
             });
         }
+        
         
         // 刷新按钮
         const refreshBtn = document.getElementById('refreshBtn');
@@ -4453,7 +5238,6 @@
     
     // 切换标签页
     function switchTab(tab) {
-        // 更新标签状态
         document.querySelectorAll('.nav-links a').forEach(link => {
             link.classList.remove('active');
         });
@@ -4466,7 +5250,6 @@
             document.getElementById('pageSubtitle').textContent = '查看和管理所有拍摄的照片，按货号分组显示';
             loadPhotos();
         } else if (tab === 'users') {
-            // 只有管理员才能访问用户管理
             if (!currentUserRole) {
                 alert('请先登录');
                 return;
@@ -4807,6 +5590,612 @@
         });
     } else {
         restoreDateValues();
+    }
+    
+    // ===== 好友聊天功能 =====
+    
+    let chatFriends = [];
+    let currentChatFriend = null;
+    let chatSocket = null;
+    let chatTypingTimer = null;
+    
+    function getCurrentUsername() {
+        try {
+            return localStorage.getItem('adminUsername') || '';
+        } catch (e) {
+            return '';
+        }
+    }
+    
+    async function loadFriends() {
+        const username = getCurrentUsername();
+        if (!username) return;
+        
+        const friendList = document.getElementById('friendList');
+        friendList.innerHTML = `<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">加载中...</div></div>`;
+        
+        try {
+            const response = await fetch(`/api/chat/friends/${username}`);
+            if (response.ok) {
+                chatFriends = await response.json();
+                renderFriendList(chatFriends);
+            } else {
+                friendList.innerHTML = `<div class="empty-state"><div class="empty-icon"><i class="fas fa-user-friends"></i></div><h3 class="empty-title">加载失败</h3></div>`;
+            }
+        } catch (error) {
+            console.error('加载好友列表失败:', error);
+            friendList.innerHTML = `<div class="empty-state"><div class="empty-icon"><i class="fas fa-exclamation-circle"></i></div><h3 class="empty-title">加载失败</h3></div>`;
+        }
+        
+        connectChatWebSocket();
+    }
+    
+    function filterFriendList() {
+        const searchTerm = document.getElementById('friendSearchInput').value.toLowerCase();
+        const filtered = chatFriends.filter(f => 
+            (f.name && f.name.toLowerCase().includes(searchTerm)) ||
+            f.username.toLowerCase().includes(searchTerm)
+        );
+        renderFriendList(filtered);
+    }
+    
+    function renderFriendList(friends) {
+        const friendList = document.getElementById('friendList');
+        if (friends.length === 0) {
+            friendList.innerHTML = `<div class="empty-state" style="padding: 30px;"><div class="empty-icon"><i class="fas fa-user-friends"></i></div><h3 class="empty-title">暂无好友</h3><p class="empty-subtitle">点击右上角"添加好友"按钮添加好友</p></div>`;
+            return;
+        }
+        
+        let html = '';
+        friends.forEach(friend => {
+            const initial = (friend.name || friend.username).charAt(0).toUpperCase();
+            const isActive = currentChatFriend && currentChatFriend.username === friend.username;
+            html += `
+                <div class="friend-item ${isActive ? 'active' : ''}" onclick="openChat('${friend.username}', '${(friend.name || friend.username).replace(/'/g, "\\'")}')">
+                    <div class="friend-avatar">${initial}</div>
+                    <div class="friend-info">
+                        <div class="friend-name">${friend.name || friend.username}</div>
+                        <div class="friend-username-text">@${friend.username}</div>
+                    </div>
+                    <button class="friend-delete-btn" onclick="event.stopPropagation(); deleteFriend('${friend.username}')" title="删除好友">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        });
+        friendList.innerHTML = html;
+    }
+    
+    async function openChat(friendUsername, friendName) {
+        currentChatFriend = { username: friendUsername, name: friendName };
+        
+        renderFriendList(chatFriends);
+        
+        const chatMain = document.getElementById('chatMain');
+        chatMain.innerHTML = `
+            <div class="chat-header">
+                <div class="friend-avatar">${(friendName || friendUsername).charAt(0).toUpperCase()}</div>
+                <div class="chat-header-info">
+                    <h4>${friendName || friendUsername}</h4>
+                    <div class="typing-indicator" id="typingIndicator" style="display:none;">对方正在输入...</div>
+                </div>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">加载消息中...</div>
+                </div>
+            </div>
+            <div class="upload-progress" id="uploadProgress">
+                <div class="upload-progress-text" id="uploadProgressText">正在上传文件...</div>
+                <div class="upload-progress-bar">
+                    <div class="upload-progress-fill" id="uploadProgressFill" style="width: 0%;"></div>
+                </div>
+            </div>
+            <div class="chat-input-area">
+                <div class="chat-input-wrapper">
+                    <textarea id="chatInput" class="chat-input" rows="1" placeholder="输入消息..." onkeydown="handleChatKeydown(event)"></textarea>
+                </div>
+                <div class="chat-input-buttons">
+                    <label class="chat-file-btn" title="发送文件（ZIP/Excel，最大2GB）">
+                        <i class="fas fa-paperclip"></i>
+                        <input type="file" id="chatFileInput" accept=".zip,.xlsx,.xls" onchange="sendFile(this)">
+                    </label>
+                    <button class="chat-send-btn" onclick="sendMessage()" title="发送">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        await loadChatMessages(friendUsername);
+        
+        const chatInput = document.getElementById('chatInput');
+        if (chatInput) {
+            chatInput.focus();
+            chatInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+                sendTypingIndicator();
+            });
+        }
+    }
+    
+    function handleChatKeydown(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+    }
+    
+    async function loadChatMessages(friendUsername) {
+        const username = getCurrentUsername();
+        if (!username) return;
+        
+        try {
+            const response = await fetch(`/api/chat/messages/${username}/${friendUsername}?limit=100`);
+            if (response.ok) {
+                const messages = await response.json();
+                renderMessages(messages);
+            }
+        } catch (error) {
+            console.error('加载聊天消息失败:', error);
+        }
+    }
+    
+    function renderMessages(messages) {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) return;
+        
+        const username = getCurrentUsername();
+        
+        if (messages.length === 0) {
+            chatMessages.innerHTML = `<div style="text-align:center;color:#95a5a6;padding:40px;">暂无消息，开始聊天吧！</div>`;
+            return;
+        }
+        
+        let html = '';
+        messages.forEach(msg => {
+            const isSent = msg.from === username;
+            const time = new Date(msg.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            
+            if (msg.type === 'file') {
+                const fileExt = (msg.fileName || '').split('.').pop().toLowerCase();
+                const isZip = fileExt === 'zip';
+                const isExcel = fileExt === 'xlsx' || fileExt === 'xls';
+                const iconClass = isZip ? 'fa-file-archive zip' : (isExcel ? 'fa-file-excel excel' : 'fa-file');
+                const iconColor = isZip ? '#e67e22' : (isExcel ? '#27ae60' : '#95a5a6');
+                
+                html += `
+                    <div class="message-wrapper ${isSent ? 'sent' : 'received'}">
+                        <div>
+                            <div class="message-bubble">
+                                <div class="message-file">
+                                    <div class="message-file-icon">
+                                        <i class="fas ${iconClass}" style="color:${iconColor};"></i>
+                                    </div>
+                                    <div class="message-file-info">
+                                        <div class="message-file-name">${msg.fileName || '文件'}</div>
+                                        <div class="message-file-size">${formatFileSize(msg.fileSize || 0)}</div>
+                                    </div>
+                                    ${msg.filePath ? `<a href="${msg.filePath}" class="message-file-download" download target="_blank"><i class="fas fa-download"></i> 下载</a>` : ''}
+                                </div>
+                            </div>
+                            <div class="message-time">${time}</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="message-wrapper ${isSent ? 'sent' : 'received'}">
+                        <div>
+                            <div class="message-bubble">
+                                <div class="message-text">${escapeHtml(msg.content || '')}</div>
+                            </div>
+                            <div class="message-time">${time}</div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        
+        chatMessages.innerHTML = html;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
+    async function sendMessage() {
+        const chatInput = document.getElementById('chatInput');
+        if (!chatInput) return;
+        
+        const content = chatInput.value.trim();
+        if (!content || !currentChatFriend) return;
+        
+        const username = getCurrentUsername();
+        if (!username) return;
+        
+        const message = {
+            type: 'chat_message',
+            from: username,
+            to: currentChatFriend.username,
+            messageType: 'text',
+            content: content
+        };
+        
+        if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+            chatSocket.send(JSON.stringify(message));
+        } else {
+            try {
+                const response = await fetch('/api/chat/messages/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(message)
+                });
+                if (response.ok) {
+                    const result = await response.json();
+                    appendMessage(result.message);
+                }
+            } catch (error) {
+                console.error('发送消息失败:', error);
+                alert('发送消息失败');
+            }
+        }
+        
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+    }
+    
+    async function sendFile(fileInput) {
+        const file = fileInput.files[0];
+        if (!file || !currentChatFriend) return;
+        
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (ext !== 'zip' && ext !== 'xlsx' && ext !== 'xls') {
+            alert('只支持发送 ZIP 和 Excel（.xlsx/.xls）文件！');
+            fileInput.value = '';
+            return;
+        }
+        
+        if (file.size > 2 * 1024 * 1024 * 1024) {
+            alert('文件大小不能超过 2GB！');
+            fileInput.value = '';
+            return;
+        }
+        
+        const username = getCurrentUsername();
+        if (!username) return;
+        
+        const uploadProgress = document.getElementById('uploadProgress');
+        const uploadProgressFill = document.getElementById('uploadProgressFill');
+        const uploadProgressText = document.getElementById('uploadProgressText');
+        
+        if (uploadProgress) uploadProgress.style.display = 'block';
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('from', username);
+        formData.append('to', currentChatFriend.username);
+        
+        try {
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    if (uploadProgressFill) uploadProgressFill.style.width = percent + '%';
+                    if (uploadProgressText) uploadProgressText.textContent = `正在上传: ${file.name} (${percent}%)`;
+                }
+            };
+            
+            xhr.onload = async function() {
+                if (uploadProgress) uploadProgress.style.display = 'none';
+                
+                if (xhr.status === 200) {
+                    const result = JSON.parse(xhr.responseText);
+                    
+                    const message = {
+                        type: 'chat_message',
+                        from: username,
+                        to: currentChatFriend.username,
+                        messageType: 'file',
+                        content: file.name,
+                        fileName: result.filename,
+                        fileSize: result.size,
+                        filePath: result.path,
+                        fileType: ext
+                    };
+                    
+                    if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+                        chatSocket.send(JSON.stringify(message));
+                    } else {
+                        try {
+                            const response = await fetch('/api/chat/messages/send', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(message)
+                            });
+                            if (response.ok) {
+                                const res = await response.json();
+                                appendMessage(res.message);
+                            }
+                        } catch (err) {
+                            console.error('发送文件消息失败:', err);
+                        }
+                    }
+                } else {
+                    alert('文件上传失败，请重试');
+                }
+            };
+            
+            xhr.onerror = function() {
+                if (uploadProgress) uploadProgress.style.display = 'none';
+                alert('文件上传失败，网络错误');
+            };
+            
+            xhr.open('POST', '/api/chat/upload', true);
+            xhr.send(formData);
+        } catch (error) {
+            if (uploadProgress) uploadProgress.style.display = 'none';
+            console.error('上传文件失败:', error);
+            alert('文件上传失败');
+        }
+        
+        fileInput.value = '';
+    }
+    
+    function appendMessage(msg) {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) return;
+        
+        const username = getCurrentUsername();
+        const isSent = msg.from === username;
+        const time = new Date(msg.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        
+        let messageHtml = '';
+        if (msg.type === 'file') {
+            const fileExt = (msg.fileName || '').split('.').pop().toLowerCase();
+            const isZip = fileExt === 'zip';
+            const isExcel = fileExt === 'xlsx' || fileExt === 'xls';
+            const iconClass = isZip ? 'fa-file-archive zip' : (isExcel ? 'fa-file-excel excel' : 'fa-file');
+            const iconColor = isZip ? '#e67e22' : (isExcel ? '#27ae60' : '#95a5a6');
+            
+            messageHtml = `
+                <div class="message-wrapper ${isSent ? 'sent' : 'received'}">
+                    <div>
+                        <div class="message-bubble">
+                            <div class="message-file">
+                                <div class="message-file-icon">
+                                    <i class="fas ${iconClass}" style="color:${iconColor};"></i>
+                                </div>
+                                <div class="message-file-info">
+                                    <div class="message-file-name">${msg.fileName || '文件'}</div>
+                                    <div class="message-file-size">${formatFileSize(msg.fileSize || 0)}</div>
+                                </div>
+                                ${msg.filePath ? `<a href="${msg.filePath}" class="message-file-download" download target="_blank"><i class="fas fa-download"></i> 下载</a>` : ''}
+                            </div>
+                        </div>
+                        <div class="message-time">${time}</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            messageHtml = `
+                <div class="message-wrapper ${isSent ? 'sent' : 'received'}">
+                    <div>
+                        <div class="message-bubble">
+                            <div class="message-text">${escapeHtml(msg.content || '')}</div>
+                        </div>
+                        <div class="message-time">${time}</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (chatMessages.querySelector('.loading-state') || chatMessages.querySelector('div[style]')) {
+            const placeholder = chatMessages.querySelector('div[style]');
+            if (placeholder && placeholder.textContent.includes('暂无消息')) {
+                chatMessages.innerHTML = '';
+            } else {
+                const loadingState = chatMessages.querySelector('.loading-state');
+                if (loadingState) loadingState.remove();
+            }
+        }
+        
+        chatMessages.insertAdjacentHTML('beforeend', messageHtml);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    
+    function connectChatWebSocket() {
+        if (chatSocket && chatSocket.readyState === WebSocket.OPEN) return;
+        
+        try {
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+            chatSocket = new WebSocket(wsUrl);
+            
+            chatSocket.onopen = function() {
+                console.log('聊天WebSocket连接已建立');
+                const username = getCurrentUsername();
+                if (username) {
+                    chatSocket.send(JSON.stringify({
+                        type: 'register',
+                        username: username
+                    }));
+                }
+            };
+            
+            chatSocket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'chat_message') {
+                        const msg = data.message;
+                        if (currentChatFriend && 
+                            (msg.from === currentChatFriend.username || msg.to === currentChatFriend.username)) {
+                            appendMessage(msg);
+                        }
+                    } else if (data.type === 'typing') {
+                        if (currentChatFriend && data.from === currentChatFriend.username) {
+                            const typingIndicator = document.getElementById('typingIndicator');
+                            if (typingIndicator) {
+                                typingIndicator.style.display = data.isTyping ? 'block' : 'none';
+                            }
+                        }
+                    } else if (data.type === 'photo_uploaded') {
+                        console.log('收到照片上传消息');
+                        debouncedLoadPhotos();
+                    }
+                } catch (error) {
+                    console.error('解析WebSocket消息失败:', error);
+                }
+            };
+            
+            chatSocket.onclose = function() {
+                console.log('聊天WebSocket连接已关闭，5秒后重连');
+                setTimeout(connectChatWebSocket, 5000);
+            };
+            
+            chatSocket.onerror = function(error) {
+                console.error('聊天WebSocket错误:', error);
+            };
+        } catch (error) {
+            console.error('建立聊天WebSocket连接失败:', error);
+        }
+    }
+    
+    function sendTypingIndicator() {
+        if (!currentChatFriend || !chatSocket || chatSocket.readyState !== WebSocket.OPEN) return;
+        
+        chatSocket.send(JSON.stringify({
+            type: 'typing',
+            from: getCurrentUsername(),
+            to: currentChatFriend.username,
+            isTyping: true
+        }));
+        
+        clearTimeout(chatTypingTimer);
+        chatTypingTimer = setTimeout(() => {
+            if (chatSocket && chatSocket.readyState === WebSocket.OPEN && currentChatFriend) {
+                chatSocket.send(JSON.stringify({
+                    type: 'typing',
+                    from: getCurrentUsername(),
+                    to: currentChatFriend.username,
+                    isTyping: false
+                }));
+            }
+        }, 2000);
+    }
+    
+    async function openAddFriendModal() {
+        const username = getCurrentUsername();
+        if (!username) return;
+        
+        try {
+            const response = await fetch('/api/auth/users');
+            if (response.ok) {
+                const allUsers = await response.json();
+                
+                const friendsResponse = await fetch(`/api/chat/friends/${username}`);
+                let friendUsernames = [];
+                if (friendsResponse.ok) {
+                    const friends = await friendsResponse.json();
+                    friendUsernames = friends.map(f => f.username);
+                }
+                
+                const select = document.getElementById('friendUsername');
+                select.innerHTML = '<option value="">请选择用户</option>';
+                
+                allUsers.forEach(user => {
+                    if (user.username !== username && !friendUsernames.includes(user.username)) {
+                        select.innerHTML += `<option value="${user.username}">${user.name || user.username} (@${user.username})</option>`;
+                    }
+                });
+                
+                if (select.options.length <= 1) {
+                    select.innerHTML = '<option value="">没有可添加的用户</option>';
+                }
+            }
+        } catch (error) {
+            console.error('获取可添加用户失败:', error);
+        }
+        
+        document.getElementById('addFriendModal').classList.add('active');
+    }
+    
+    async function addFriend() {
+        const username = getCurrentUsername();
+        const friendUsername = document.getElementById('friendUsername').value;
+        
+        if (!friendUsername) {
+            alert('请选择要添加的好友');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/chat/friends', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, friendUsername })
+            });
+            
+            if (response.ok) {
+                alert('好友添加成功！');
+                closeModal('addFriendModal');
+                loadFriends();
+            } else {
+                const errorData = await response.json();
+                alert(`添加失败: ${errorData.error}`);
+            }
+        } catch (error) {
+            console.error('添加好友失败:', error);
+            alert('添加好友失败');
+        }
+    }
+    
+    async function deleteFriend(friendUsername) {
+        const username = getCurrentUsername();
+        if (!confirm(`确定要删除好友 ${friendUsername} 吗？`)) return;
+        
+        try {
+            const response = await fetch('/api/chat/friends', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, friendUsername })
+            });
+            
+            if (response.ok) {
+                if (currentChatFriend && currentChatFriend.username === friendUsername) {
+                    currentChatFriend = null;
+                    document.getElementById('chatMain').innerHTML = `
+                        <div class="chat-placeholder">
+                            <i class="fas fa-comments" style="font-size: 64px; color: #e0e0e0; margin-bottom: 20px;"></i>
+                            <h3>选择一个好友开始聊天</h3>
+                            <p>点击左侧好友列表中的好友开始对话</p>
+                        </div>
+                    `;
+                }
+                loadFriends();
+            } else {
+                const errorData = await response.json();
+                alert(`删除失败: ${errorData.error}`);
+            }
+        } catch (error) {
+            console.error('删除好友失败:', error);
+            alert('删除好友失败');
+        }
     }
     </script>
 </body>

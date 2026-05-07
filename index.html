@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>H5拍照应用 - 登录</title>
-        <link rel="icon" href="data:,">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>H5拍照应用 - 登录</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -1304,6 +1304,8 @@
                         currentNumber = 1;
                     }
                     capturedPhotos = []; // 清空照片列表
+                    // 新的一组照片，清除之前的batchId
+                    window.currentBatchId = null;
                     
                     // 清空输入框
                     productCodeInput.value = '';
@@ -1363,13 +1365,26 @@
                         let totalUploaded = 0;
                         
                         // 为整个批次生成唯一的批次ID，确保每次操作都是唯一的一组
-                        const batchId = Date.now().toString() + '-' + Math.floor(Math.random() * 1000000).toString() + '-' + Math.random().toString(36).substr(2, 9);
+                        // 使用固定的batchId：优先使用已有的，避免重复上传时生成新的分组
+                        let batchId = window.currentBatchId;
+                        if (!batchId) {
+                            batchId = Date.now().toString() + '-' + Math.floor(Math.random() * 1000000).toString() + '-' + Math.random().toString(36).substr(2, 9);
+                            window.currentBatchId = batchId;
+                        }
                         // 组命名按货号+批次ID，确保每次操作都是独立的一组
                         const uniqueProductCode = productCode + '-' + batchId;
                         
-                        const uploadPromises = [];
-                        for (let uploadIndex = 0; uploadIndex < capturedPhotos.length; uploadIndex++) {
-                            const photo = capturedPhotos[uploadIndex];
+                        function base64ToBlob(base64, mimeType) {
+                            const byteCharacters = atob(base64.split(',')[1]);
+                            const byteNumbers = new Array(byteCharacters.length);
+                            for (let bi = 0; bi < byteCharacters.length; bi++) {
+                                byteNumbers[bi] = byteCharacters.charCodeAt(bi);
+                            }
+                            const byteArray = new Uint8Array(byteNumbers);
+                            return new Blob([byteArray], { type: mimeType || 'image/jpeg' });
+                        }
+
+                        async function uploadSinglePhoto(photo, uploadIndex) {
                             try {
                                 const formData = new FormData();
                                 formData.append('productCode', uniqueProductCode);
@@ -1379,16 +1394,6 @@
                                 if (currentShareCode) {
                                     formData.append('shareCode', currentShareCode);
                                 }
-
-                                function base64ToBlob(base64, mimeType) {
-                                    const byteCharacters = atob(base64.split(',')[1]);
-                                    const byteNumbers = new Array(byteCharacters.length);
-                                    for (let bi = 0; bi < byteCharacters.length; bi++) {
-                                        byteNumbers[bi] = byteCharacters.charCodeAt(bi);
-                                    }
-                                    const byteArray = new Uint8Array(byteNumbers);
-                                    return new Blob([byteArray], { type: mimeType || 'image/jpeg' });
-                                }
                                 const uniqueFilename = suffix ?
                                     `${photo.filename.replace('.jpg', '')}_${Date.now()}_${uploadIndex}.jpg` :
                                     `${productCode}_${Date.now()}_${uploadIndex}.jpg`;
@@ -1397,47 +1402,64 @@
                                 formData.append('displayFilename', photo.filename.replace('.jpg', ''));
                                 formData.append('displayName', productCode);
 
-                                console.log('开始上传照片:', photo.filename);
-
-                                try {
-                                    const controller = new AbortController();
-                                    const timeoutId = setTimeout(() => controller.abort(), 60000);
-
-                                    const res = await fetch('/api/photos', {
-                                        method: 'POST',
-                                        body: formData,
-                                        signal: controller.signal
-                                    });
-
-                                    clearTimeout(timeoutId);
-
-                                    console.log(`上传响应状态: ${res.status} ${res.statusText}`);
-
-                                    if (res.ok) {
-                                        successCount++;
-                                        uploadedFiles.push(photo.filename);
-                                        console.log(`成功上传: ${photo.filename}`);
-                                    } else {
-                                        console.log(`上传失败: ${photo.filename}`);
-                                        try {
-                                            const errorData = await res.json();
-                                            console.log(`上传错误信息:`, errorData);
-                                        } catch (e) {
-                                            console.log(`无法解析错误信息:`, e);
+                                let uploaded = false;
+                                for (let retryCount = 0; retryCount < 3 && !uploaded; retryCount++) {
+                                    try {
+                                        const controller = new AbortController();
+                                        const timeoutId = setTimeout(() => controller.abort(), 120000);
+                                        const res = await fetch('/api/photos', {
+                                            method: 'POST',
+                                            body: formData,
+                                            signal: controller.signal
+                                        });
+                                        clearTimeout(timeoutId);
+                                        if (res.ok) {
+                                            uploaded = true;
+                                            return { success: true, filename: photo.filename };
+                                        } else {
+                                            if (retryCount < 2) {
+                                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                            }
+                                        }
+                                    } catch (err) {
+                                        if (retryCount < 2) {
+                                            await new Promise(resolve => setTimeout(resolve, 1000));
                                         }
                                     }
-                                } catch (err) {
-                                    console.error(`上传 ${photo.filename} 失败:`, err);
                                 }
+                                return { success: false, filename: photo.filename };
                             } catch (err) {
-                                console.error(`上传 ${photo.filename} 失败:`, err);
-                            } finally {
+                                return { success: false, filename: photo.filename };
+                            }
+                        }
+
+                        const CONCURRENCY_LIMIT = 3;
+                        const uploadTasks = capturedPhotos.map((photo, index) => () =>
+                            uploadSinglePhoto(photo, index).then(result => {
                                 totalUploaded++;
+                                if (result.success) {
+                                    successCount++;
+                                    uploadedFiles.push(result.filename);
+                                }
                                 const progress = Math.round((totalUploaded / capturedPhotos.length) * 100);
                                 uploadProgressBar.style.width = `${progress}%`;
                                 uploadProgressText.textContent = `${progress}% (${totalUploaded}/${capturedPhotos.length})`;
+                                return result;
+                            })
+                        );
+
+                        const executing = new Set();
+                        for (const task of uploadTasks) {
+                            const p = task().then(result => {
+                                executing.delete(p);
+                                return result;
+                            });
+                            executing.add(p);
+                            if (executing.size >= CONCURRENCY_LIMIT) {
+                                await Promise.race(executing);
                             }
                         }
+                        await Promise.all(executing);
                         
                         console.log('批量上传完成:', successCount, '张成功');
                         console.log('上传的文件:', uploadedFiles);
@@ -1468,6 +1490,8 @@
                         
                         if (successCount === capturedPhotos.length) {
                             alert(`成功上传 ${successCount} 张照片！\n文件: ${uploadedFiles.join(', ')}\n\n后台未导出货号: ${unexportedProductCodeCount}\n未导出照片: ${unexportedPhotoCount}`);
+                            // 上传成功后清除batchId
+                            window.currentBatchId = null;
                         } else if (successCount > 0) {
                             const failedPhotos = capturedPhotos.filter(p => !uploadedFiles.includes(p.filename));
                             alert(`部分上传成功: ${successCount}/${capturedPhotos.length} 张照片\n成功: ${uploadedFiles.join(', ')}\n失败: ${failedPhotos.map(p => p.filename).join(', ')}\n\n后台未导出货号: ${unexportedProductCodeCount}\n未导出照片: ${unexportedPhotoCount}`);
@@ -1476,11 +1500,13 @@
                             uploadProgress.style.display = 'none';
                             uploadPhotoBtn.disabled = false;
                             getUnexportedCount();
+                            // 保留currentBatchId以便重试时使用相同的分组
                             return;
                         } else {
                             alert('上传失败，请重试');
                             uploadProgress.style.display = 'none';
                             uploadPhotoBtn.disabled = false;
+                            // 保留currentBatchId以便重试时使用相同的分组
                             return;
                         }
                         
@@ -1494,6 +1520,8 @@
                         if (capturedImageEl) capturedImageEl.src = '';
                         capturedPhotos = [];
                         currentNumber = 1;
+                        // 清除batchId，确保下一批新照片使用新的分组
+                        window.currentBatchId = null;
                         
                         // 清空照片列表
                         updatePhotoGallery();
@@ -1700,6 +1728,24 @@
         
 
         
+        function compressImage(dataUrl, quality) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = function() {
+                    resolve(dataUrl);
+                };
+                img.src = dataUrl;
+            });
+        }
+
         function handleSystemCameraPhoto(file) {
             let assignedNumber;
             let assignedFilename;
@@ -1720,8 +1766,8 @@
             }
 
             const reader = new FileReader();
-            reader.onload = (e) => {
-                capturedImage = e.target.result;
+            reader.onload = async (e) => {
+                capturedImage = await compressImage(e.target.result, 0.2);
                 capturedImageEl.src = capturedImage;
 
                 let filename = assignedFilename;
@@ -2353,7 +2399,7 @@
             );
             
             // 转换为base64
-            const croppedImage = croppedCanvas.toDataURL('image/jpeg');
+            const croppedImage = croppedCanvas.toDataURL('image/jpeg', 0.2);
             
             // 更新全局变量
             capturedImage = croppedImage;
