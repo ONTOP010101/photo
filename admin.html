@@ -3862,6 +3862,13 @@
                 selectionInfo.textContent = message;
             }
         }
+        
+        // 更新全选复选框状态
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        if (selectAllCheckbox && productCheckboxes.length > 0) {
+            const allChecked = Array.from(productCheckboxes).every(checkbox => checkbox.checked);
+            selectAllCheckbox.checked = allChecked;
+        }
     }
     
     // 全选/取消全选
@@ -5205,11 +5212,8 @@
         // 全选复选框事件
         const selectAllCheckbox = document.getElementById('selectAllCheckbox');
         if (selectAllCheckbox) {
-            selectAllCheckbox.addEventListener('click', function(e) {
-                // 阻止默认行为
-                e.preventDefault();
-                // 总是设置为选中状态
-                this.checked = true;
+            selectAllCheckbox.addEventListener('change', function(e) {
+                const isChecked = this.checked;
                 const productCheckboxes = document.querySelectorAll('.product-checkbox');
                 
                 // 获取当前页面的状态
@@ -5223,13 +5227,21 @@
                     status = 'unexported';
                 }
                 
-                // 清空对应页面的选择状态
-                selectedProductCodes[status].clear();
+                // 根据全选状态更新选择
+                if (isChecked) {
+                    // 全选：添加所有货号到选择集合
+                    productCheckboxes.forEach(checkbox => {
+                        checkbox.checked = true;
+                        selectedProductCodes[status].add(checkbox.value);
+                    });
+                } else {
+                    // 取消全选：清空选择集合
+                    productCheckboxes.forEach(checkbox => {
+                        checkbox.checked = false;
+                    });
+                    selectedProductCodes[status].clear();
+                }
                 
-                productCheckboxes.forEach(checkbox => {
-                    checkbox.checked = true;
-                    selectedProductCodes[status].add(checkbox.value);
-                });
                 // 更新选中信息
                 updateSelectionInfo();
             });
